@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<!-- 修改本项目前，请先读根目录 public/AGENTS.md（文件地图/加载顺序/任务路由）。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>武侠放置</title>
+<meta name="description" content="水墨武侠放置游戏，含修炼、垂钓、烹饪、切磋、羁绊与入梦挑战。">
+<meta property="og:title" content="武侠放置">
+<meta property="og:description" content="水墨武侠放置游戏，含修炼、垂钓、烹饪、切磋、羁绊与入梦挑战。">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* 有存档时，首帧渲染就隐藏创建角色界面，避免刷新一闪 */
+  html.has-save #createScreen { display: none; }
+</style>
+<script>
+  (function () {
+    try {
+      var raw = localStorage.getItem('wuxia_save_v1');
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (d && d.player && d.player.surname) {
+        document.documentElement.classList.add('has-save');
+      }
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+<div id="app">
+
+  <div id="createScreen" class="screen active">
+    <div class="create-box">
+      <h1>初 入 江 湖</h1>
+      <div class="field">
+        <label>姓</label>
+        <input id="surname" maxlength="4" value="王" placeholder="请输入姓氏">
+      </div>
+      <div class="field">
+        <label>名</label>
+        <input id="givenName" maxlength="6" value="二狗" placeholder="请输入名字">
+      </div>
+      <div class="field">
+        <label>字</label>
+        <input id="zi" maxlength="6" value="" placeholder="请输入字">
+      </div>
+      <div class="field">
+        <label>性别</label>
+        <div class="gender-group">
+          <button type="button" class="gender-btn active" data-gender="男">男</button>
+          <button type="button" class="gender-btn" data-gender="女">女</button>
+        </div>
+      </div>
+
+      <div id="attrList">
+        <div class="attr-row">
+          <div>
+            <div class="attr-name">根骨</div>
+            <div class="attr-desc">提升外功、内功及部分技艺修炼速度，每点延绵不绝 +0.5</div>
+          </div>
+          <div class="attr-ctrl">
+            <button data-attr="root" data-dir="-1">−</button>
+            <span class="attr-val" id="val-root">5</span>
+            <button data-attr="root" data-dir="1">+</button>
+          </div>
+        </div>
+        <div class="attr-row">
+          <div>
+            <div class="attr-name">悟性</div>
+            <div class="attr-desc">提升招式、轻功及部分技艺修炼速度，每点虚实莫测 +0.5</div>
+          </div>
+          <div class="attr-ctrl">
+            <button data-attr="comp" data-dir="-1">−</button>
+            <span class="attr-val" id="val-comp">5</span>
+            <button data-attr="comp" data-dir="1">+</button>
+          </div>
+        </div>
+        <div class="attr-row">
+          <div>
+            <div class="attr-name">定力</div>
+            <div class="attr-desc">提升内力获取速度及部分技艺修炼速度，每点神宁气静 +0.5</div>
+          </div>
+          <div class="attr-ctrl">
+            <button data-attr="luck" data-dir="-1">−</button>
+            <span class="attr-val" id="val-luck">5</span>
+            <button data-attr="luck" data-dir="1">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="remain">剩余点数 <b id="remain">0</b></div>
+      <button class="main-btn" id="startBtn">踏 入 江 湖</button>
+    </div>
+  </div>
+
+  <div id="gameScreen" class="screen">
+    <div class="topbar">
+      <button data-tab="main" class="active">主界面</button>
+      <button data-tab="attr">属性</button>
+      <button data-tab="bag">背包</button>
+      <button data-tab="skill">武功</button>
+      <button data-tab="technique">技艺</button>
+      <button data-tab="battle">战斗</button>
+      <button data-tab="bond">羁绊</button>
+      <button data-tab="dream">入梦</button>
+      <button data-tab="settings">设置</button>
+    </div>
+
+    <div class="game-body">
+    <div class="game-main">
+
+    <div id="mainTab" class="tab-content">
+      <div class="left-col">
+        <div class="panel">
+          <div class="panel-title">属 性</div>
+          <div class="stat-line"><span class="name">姓名</span><b id="s-name">—</b></div>
+          <div class="stat-line"><span class="name">性别</span><b id="s-gender">—</b></div>
+          <div class="stat-line"><span class="name">字</span><b id="s-zi">—</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="每点提升3%外功、内功及部分技艺修炼速度，0.5点延绵不绝">根骨</span><b id="s-root">5</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="每点提升3%招式、轻功及部分技艺修炼速度，0.5点虚实莫测">悟性</span><b id="s-comp">5</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="每点提升2.5%内力获取速度及部分技艺修炼速度，0.5点神宁气静">定力</span><b id="s-luck">5</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="每点提升20生命上限、1点减伤，同时还会影响招式伤害">体魄</span><b id="s-con">3</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="每点内力提供 0.5 点最终增伤与减伤，随时间自然增长">内力</span><b id="s-neili">0.000</b></div>
+        </div>
+      </div>
+
+      <div id="storyView">
+        <div class="panel story-panel">
+          <div class="panel-title">江 湖 起 点</div>
+          <div id="storyContent" class="story-content"></div>
+          <div class="story-continue">
+            <button class="main-btn" id="storyContinueBtn" type="button">继 续</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="villageView" style="display:none">
+        <div class="village-view">
+          <div class="village-head">
+            <div class="village-name">赵 家 村</div>
+            <div class="village-intro">一座依山傍水的小村子，村民多以务农打铁为生。村口有棵老槐树，日子过得平淡而安稳。</div>
+          </div>
+          <div class="place-list">
+            <div class="place-card">
+              <div class="place-name">你 的 家</div>
+              <div class="place-desc">赵铁柱与何巧娘的家，屋子不大，却总有饭菜的香气。</div>
+              <div class="npc-row">
+                <div class="npc-box npc-puying" id="npcXiaPuying">夏 扑 萤</div>
+                <div class="npc-box npc-puying" id="npcXiaPuyingHome" style="display:none">夏 扑 萤</div>
+                <div class="npc-box npc-mystery" id="npcBuSuzhike" data-tip="家门口忽然出现了一位不请自来的客人" style="display:none">不 速 之 客</div>
+              </div>
+              <div class="training-actions">
+                <button type="button" id="trainInternalBtn">打坐入定</button>
+                <button type="button" id="trainDummyBtn">打木桩</button>
+                <button type="button" id="trainPlumBtn">梅花桩</button>
+              </div>
+            </div>
+            <div class="place-card">
+              <div class="place-name">铁 匠 铺</div>
+              <div class="place-desc">赵铁柱打铁营生的地方，炉火终日不熄，叮当声能传半条街。</div>
+              <div class="npc-row">
+                <div class="npc-box" id="npcZhaoTiezhu" data-tip="你和夏扑萤的养父，也是村里唯一的铁匠">赵 铁 柱</div>
+              </div>
+            </div>
+            <div class="place-card">
+              <div class="place-name">乾 元 书 舍</div>
+              <div class="place-desc">村中唯一的学堂，院中种着一株老梅，李先生平日里就在这里教书。</div>
+              <div class="npc-row">
+                <div class="npc-box" id="npcLiQianyuan" data-tip="村里的教书先生，自三年前来到赵家村后便在此定居" style="display:none">李 乾 元</div>
+                <div class="npc-box" id="npcShutong" data-tip="李乾元的书童，夏扑萤说可以揍他一顿来磨砺武艺" style="display:none">书 童</div>
+              </div>
+            </div>
+            <div class="place-card">
+              <div class="place-name">医 馆</div>
+              <div class="place-desc">村里唯一的大夫开的铺子，隔着老远就能闻到草药味。</div>
+              <div class="npc-row">
+                <div class="npc-box" id="npcZhaoDaifu" data-tip="赵大夫，他的名字就叫赵大夫，白发苍苍，已至古稀">赵 大 夫</div>
+              </div>
+            </div>
+            <div class="place-card">
+              <div class="place-name">后 山</div>
+              <div class="place-desc">村后的连绵山林，野果野菜不少，也时常有野兽出没。</div>
+              <div class="npc-row">
+                <div class="npc-box npc-puying" id="npcXiaPuyingHill" style="display:none">夏 扑 萤</div>
+                <button type="button" id="luoyingBtn" class="event" style="display:none">落 英</button>
+              </div>
+              <div class="npc-row">
+                <div class="npc-box" id="npcZhaoShip" data-tip="村里的猎户，做事毛毛躁躁的，但人还不错">赵 十 二</div>
+              </div>
+              <div class="training-actions">
+                <button type="button" id="trainExternalBtn">瀑布锻体</button>
+                <button type="button" id="fishingBtn" style="display:none">溪边垂钓</button>
+                <button type="button" id="cookingOpenBtn" style="display:none">后山烹饪</button>
+              </div>
+            </div>
+          </div>
+          <div class="training-status" id="trainingStatus">当前未开始修炼</div>
+        </div>
+      </div>
+
+      <div id="dialogView" style="display:none">
+        <div class="dialog-scene">
+          <div class="dialog-speaker" id="dialogSpeaker">夏 扑 萤</div>
+          <div class="dialog-text" id="dialogText"></div>
+          <div class="dialog-options" id="dialogOptions"></div>
+        </div>
+      </div>
+
+      <div id="intelPanel" class="panel">
+        <div class="panel-title intel-title">
+          <span>情 报 日 志</span>
+          <button type="button" class="intel-filter-btn" id="intelCompanionFilter">陪伴</button>
+        </div>
+        <div id="intelList" class="intel-list"></div>
+      </div>
+    </div>
+
+    <div id="attrTab" class="tab-content hidden">
+      <div class="attr-wrap">
+        <div class="panel">
+          <div class="panel-title">详 细 属 性</div>
+          <div class="attr-subtitle">根 基</div>
+          <div class="stat-line"><span class="name">姓名</span><b id="a-name">—</b></div>
+          <div class="stat-line"><span class="name">性别</span><b id="a-gender">—</b></div>
+          <div class="stat-line"><span class="name">字</span><b id="a-zi">—</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="每点提升3%外功、内功及部分技艺修炼速度，0.5点延绵不绝">根骨</span><b id="a-root">5</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="每点提升3%招式、轻功及部分技艺修炼速度，0.5点虚实莫测">悟性</span><b id="a-comp">5</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="每点提升2.5%内力获取速度及部分技艺修炼速度，0.5点神宁气静">定力</span><b id="a-luck">5</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="提升生命上限、伤害减免与攻击伤害">体魄</span><b id="a-con">3</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="每点内力提供 0.5 点最终增伤与减伤，随时间自然增长">内力</span><b id="a-neili">0.000</b></div>
+
+          <div class="attr-subtitle">战 力</div>
+          <div class="stat-line"><span class="name">气血上限</span><b id="a-hp">0</b></div>
+          <div class="stat-line"><span class="name">气血恢复</span><b id="a-regen">0</b></div>
+          <div class="stat-line"><span class="name">伤害减免</span><b id="a-dr">0</b></div>
+          <div class="stat-line"><span class="name">内力增速</span><b id="a-neili-rate">0/分钟</b></div>
+          <div class="stat-line"><span class="name">内力增伤</span><b id="a-neili-dmg">0</b></div>
+          <div class="stat-line"><span class="name">内力减伤</span><b id="a-neili-dr">0</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="攻击命中判定：最终命中率 = 命中率 - 敌人闪避率">命中率</span><b id="a-hit">90%</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="敌方攻击时进行闪避判定：最终命中率 = 敌人命中率 - 闪避率">闪避率</span><b id="a-evade">5%</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="触发几率 =（我方延绵不绝 - 敌方根骨×0.5/2）%：触发后额外进行一次相同的行动，这次行动的效果只有原本的30%">延绵不绝</span><b id="a-combo">0%</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="触发几率 =（我方虚实莫测 - 敌方悟性×0.5/2）%：触发后本次攻击命中率提升50%，溢出的命中转化为增伤">虚实莫测</span><b id="a-crit">0%</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="触发几率 =（我方神宁气静 - 敌方定力×0.5/2）%：触发后闪避率提升30%，额外进行一次闪避判定（取成功的一次，两次皆失败则判定为命中）">神宁气静</span><b id="a-shenning">0%</b></div>
+          <div class="stat-line"><span class="name">行动速度</span><b id="a-speed">0.15</b></div>
+          <div class="stat-line"><span class="name">夏扑萤羁绊</span><b id="a-bond">0</b></div>
+
+          <div class="attr-subtitle">武 学</div>
+          <div class="stat-line"><span class="name">拳掌</span><b id="a-fist">0</b></div>
+          <div class="stat-line"><span class="name">刀法</span><b id="a-blade">0</b></div>
+          <div class="stat-line"><span class="name">剑法</span><b id="a-sword">0</b></div>
+          <div class="stat-line"><span class="name">长兵</span><b id="a-changbing">0</b></div>
+          <div class="stat-line"><span class="name">奇门</span><b id="a-qimen">0</b></div>
+          <div class="stat-line"><span class="name">暗器</span><b id="a-hidden">0</b></div>
+          <div class="stat-line"><span class="name">医术</span><b id="a-medicine">0</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="bagTab" class="tab-content hidden">
+      <div class="bag-wrap">
+        <div class="panel bag-panel">
+          <div class="panel-title">背 包</div>
+          <div class="bag-toolbar">
+            <span class="bag-count">共 <b id="bagCount">0</b> 格</span>
+            <div class="bag-toolbar-actions">
+              <button type="button" id="bagEatAllBtn">食用全部食物</button>
+              <button type="button" id="bagSortBtn">整理</button>
+            </div>
+          </div>
+          <div id="bagGrid" class="bag-grid"></div>
+          <div class="bag-empty" id="bagEmpty">行囊空空如也。</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="skillTab" class="tab-content hidden">
+      <div class="skill-subtabs">
+        <button type="button" class="skill-subtab" id="skillStudyBtn" style="display:none">钻 研</button>
+        <button type="button" class="skill-subtab" id="skillTechBtn">特 技</button>
+        <button type="button" class="skill-subtab" id="skillStrategyBtn">战斗策略</button>
+        <button type="button" class="skill-subtab" id="bondBattleStrategyBtn">羁绊角色战斗策略</button>
+      </div>
+      <div id="skillCombatTechPanel" class="skill-combat-tech hidden"></div>
+      <div class="skill-columns">
+        <div class="skill-col">
+          <div class="skill-col-title">招 式</div>
+          <div class="skill-select-row"><label for="train-select-招式">当前修炼</label><select id="train-select-招式" data-train-type="招式"><option value="">未选择</option></select></div><div id="skill-col-招式"></div>
+        </div>
+        <div class="skill-col">
+          <div class="skill-col-title">轻 功</div>
+          <div class="skill-select-row"><label for="train-select-轻功">当前修炼</label><select id="train-select-轻功" data-train-type="轻功"><option value="">未选择</option></select></div><div id="skill-col-轻功"></div>
+        </div>
+        <div class="skill-col">
+          <div class="skill-col-title">外 功</div>
+          <div class="skill-select-row"><label for="train-select-外功">当前修炼</label><select id="train-select-外功" data-train-type="外功"><option value="">未选择</option></select></div><div id="skill-col-外功"></div>
+        </div>
+        <div class="skill-col">
+          <div class="skill-col-title">内 功</div>
+          <div class="skill-select-row"><label for="train-select-内功">当前修炼</label><select id="train-select-内功" data-train-type="内功"><option value="">未选择</option></select></div><div id="skill-col-内功"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="techniqueTab" class="tab-content hidden">
+      <div class="skill-columns technique-columns">
+        <div class="skill-col">
+          <div class="skill-col-title">技 艺</div>
+          <div id="technique-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="settingsTab" class="tab-content hidden">
+      <div class="attr-wrap">
+        <div class="panel settings-panel">
+          <div class="panel-title">设 置</div>
+          <div class="attr-subtitle">界 面 显 示</div>
+          <div class="setting-row setting-size">
+            <label for="fontSize">字号大小</label>
+            <input id="fontSize" type="range" min="1" max="1.4" step="0.05" value="1.1">
+            <span id="fontSizeValue">110%</span>
+          </div>
+          <p class="setting-hint">默认字体固定不变，字号调整会自动保存。</p>
+          <div class="attr-subtitle">离 线 收 益</div>
+          <div class="setting-row setting-toggle">
+            <div><strong>离线收益</strong><p class="setting-hint">关闭后，离开游戏期间不再结算内力、武功、垂钓等离线收益。</p></div>
+            <label class="switch" for="offlineEarningsToggle">
+              <input id="offlineEarningsToggle" type="checkbox" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
+          <div class="attr-subtitle">存 档 管 理</div>
+          <div class="setting-row setting-reset">
+            <div><strong>重新开始</strong><p>删除当前角色进度，并重新创建角色。</p></div>
+            <button id="resetBtn" type="button">重新开始</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="battleTab" class="tab-content hidden">
+      <div class="battle-wrap">
+        <div class="battle-log" id="battleLog"></div>
+        <div class="battle-toolbar">
+          <button class="main-btn" id="battlePauseBtn" type="button" style="display:none">暂 停 战 斗</button>
+          <button class="main-btn" id="battleForfeitBtn" type="button" style="display:none">放 弃 战 斗</button>
+          <button class="main-btn" id="battleLeaveBtn" type="button" style="display:none">离 开 战 斗</button>
+        </div>
+        <div class="battle-arena">
+          <div class="battle-side">
+            <div class="battle-side-title">己 方</div>
+            <div class="battle-side-grid" id="allySide"></div>
+          </div>
+          <div class="battle-side">
+            <div class="battle-side-title">敌 方</div>
+            <div class="battle-side-grid" id="enemySide"></div>
+          </div>
+        </div>
+        <div class="battle-msg" id="battleMsg">当前暂无战斗</div>
+      </div>
+    </div>
+
+    </div>
+    </div>
+
+    <div id="bondTab" class="tab-content hidden">
+      <div class="attr-wrap">
+        <div class="panel bond-panel">
+          <div class="panel-title">羁 绊</div>
+          <div class="bond-stat">当前陪伴：<b id="bc-companion">夏扑萤</b></div>
+          <div id="bondCharBox" class="bond-char">
+            <div class="bond-head">
+              <div class="bond-name">夏 扑 萤</div>
+              <div class="bond-bond">羁绊：<b id="bc-bond">50</b></div>
+            </div>
+            <div class="bond-stat">根骨：<b id="bc-root">12</b></div>
+            <div class="bond-stat">悟性：<b id="bc-comp">25</b></div>
+            <div class="bond-stat">定力：<b id="bc-luck">15</b></div>
+            <div class="bond-stat">体魄：<b id="bc-con">25</b></div>
+            <div class="bond-stat">内力：<b id="bc-neili">70</b></div>
+            <div class="bond-stat">行动速度：<b id="bc-speed">0.37</b></div>
+            <div class="bond-divider"></div>
+            <div id="bc-skill-list">
+              <div class="bond-skill">青鸢飞纵（十二重）</div>
+              <div class="bond-skill">飞石破（九重）</div>
+              <div class="bond-skill">淬火呼吸法（九重）</div>
+            </div>
+            <div class="bond-divider"></div>
+            <div class="bond-martial-grid">
+              <div class="bond-martial-col">
+                <div class="bond-stat">拳掌：<b id="bc-fist">20</b></div>
+                <div class="bond-stat">剑法：<b id="bc-sword">20</b></div>
+                <div class="bond-stat">刀法：<b id="bc-blade">20</b></div>
+              </div>
+              <div class="bond-martial-col">
+                <div class="bond-stat">长兵：<b id="bc-changbing">20</b></div>
+                <div class="bond-stat">奇门：<b id="bc-qimen">20</b></div>
+                <div class="bond-stat">暗器：<b id="bc-hidden">68</b></div>
+              </div>
+            </div>
+            <div class="bond-divider"></div>
+            <div class="bond-note" id="bc-note">战斗中全属性 +50%</div>
+            <div class="bond-btn-grid">
+              <button type="button" class="bond-spar-btn" id="bondSparBtn">切 磋</button>
+              <button type="button" class="bond-spar-btn" id="bondTeachBtn">请 教</button>
+              <button type="button" class="bond-spar-btn" id="bondCompanionBtn">陪 伴</button>
+              <button type="button" class="bond-spar-btn" id="bondTransferBtn">传 授</button>
+              <button type="button" class="bond-spar-btn" id="bondStrategyBtn">修行策略</button>
+              <button type="button" class="bond-spar-btn" id="bondGuideBtn">指 点</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="dreamTab" class="tab-content hidden">
+      <div class="dream-wrap">
+        <div class="dream-tip">你可以在这里进行一些特殊的挑战，挑战可以重复进行，但奖励只会获得一次。</div>
+        <div class="dream-body">
+          <div class="dream-list-col">
+            <div class="panel dream-list-panel">
+              <div class="panel-title">入 梦</div>
+              <div id="dreamList" class="dream-list"></div>
+            </div>
+          </div>
+          <div class="dream-detail-col">
+            <div class="panel dream-detail-panel">
+              <div class="dream-detail-head">
+                <div class="dream-detail-title" id="dreamTitle">—</div>
+                <div class="dream-detail-state" id="dreamState"></div>
+              </div>
+              <div class="dream-detail-intro" id="dreamIntro"></div>
+              <div class="dream-detail-reward">
+                <div class="dream-reward-title">奖 励</div>
+                <div id="dreamRewards"></div>
+              </div>
+              <button type="button" class="dream-start-btn" id="dreamStartBtn">入 梦 挑 战</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="bagModal" class="bag-modal">
+    <div class="bag-modal-box">
+      <div class="bag-modal-title" id="bagModalTitle">物品</div>
+      <div class="bag-modal-desc" id="bagModalDesc"></div>
+      <div class="bag-modal-actions">
+        <button type="button" id="bagUseBtn">使用</button>
+        <button type="button" id="bagUseAllBtn">全部使用</button>
+        <button type="button" id="bagCloseBtn">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bondModal" class="bag-modal">
+    <div class="bag-modal-box bond-modal-box">
+      <div class="bag-modal-title" id="bondModalTitle">羁 绊</div>
+      <div class="bag-modal-desc" id="bondModalDesc"></div>
+      <div id="bondModalBody"></div>
+      <div class="bag-modal-actions" id="bondModalActions"></div>
+    </div>
+  </div>
+
+  <div id="cookingOverlay" class="cooking-overlay">
+    <div class="cooking-box">
+      <div class="cooking-head">
+        <span>后 山 · 火 堆 烹 饪</span>
+        <button type="button" id="cookingCloseBtn">关闭</button>
+      </div>
+      <div class="cooking-grid">
+        <div class="cooking-col">
+          <div class="cooking-col-title">食 谱</div>
+          <div id="cookingRecipeList"></div>
+        </div>
+        <div class="cooking-col">
+          <div class="cooking-col-title">炉 灶</div>
+          <div id="stoveInfo"></div>
+          <div class="cooking-progress">
+            <div class="cooking-progress-bar" id="cookingProgressFill"></div>
+          </div>
+          <div class="cooking-status" id="cookingStatusText">选择食材后点击烹饪</div>
+          <button type="button" id="cookingStartBtn" class="main-btn">开始烹饪</button>
+        </div>
+        <div class="cooking-col">
+          <div class="cooking-col-title">食 材</div>
+          <div id="cookingIngredientList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="strategyOverlay" class="strategy-overlay">
+    <div class="strategy-box">
+      <div class="strategy-head">
+        <span>战 斗 策 略</span>
+        <button type="button" id="strategyCloseBtn">关闭</button>
+      </div>
+      <div class="strategy-body">
+        <label class="strategy-enable">
+          <input type="checkbox" id="strategyEnable">
+          <span>启用战斗策略（关闭时按默认招式战斗）</span>
+        </label>
+        <div class="strategy-hint">按回合顺序循环使用技能或特技。循环次数 -1 表示无限；设为 1 则从第二次循环开始跳过该技能。未选择技能的回合会被跳过。气血低于阈值时优先使用指定技能或特技，且不消耗回合策略。</div>
+        <div class="strategy-rounds" id="strategyRounds"></div>
+        <div class="strategy-lowhp">
+          <span>气血低于</span>
+          <input type="number" id="strategyLowHpPct" min="1" max="100" step="1" value="30">
+          <span>% 时，立刻使用</span>
+          <select id="strategyLowHpSkill"></select>
+        </div>
+      </div>
+      <div class="strategy-foot">
+        <button type="button" id="strategySaveBtn" class="main-btn">保 存 策 略</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bondBattleStrategyOverlay" class="strategy-overlay">
+    <div class="strategy-box">
+      <div class="strategy-head">
+        <span>羁 绊 角 色 战 斗 策 略</span>
+        <button type="button" id="bondBattleStrategyCloseBtn">关闭</button>
+      </div>
+      <div class="strategy-body">
+        <label class="strategy-enable">
+          <input type="checkbox" id="bondBattleStrategyEnable">
+          <span>启用羁绊角色战斗策略（关闭时按默认招式战斗）</span>
+        </label>
+        <div class="strategy-hint">按回合顺序循环使用羁绊角色已学会的招式。循环次数 -1 表示无限；设为 1 则从第二次循环开始跳过该技能。未选择技能的回合会被跳过。气血低于阈值时优先使用指定技能，且不消耗回合策略。</div>
+        <div class="strategy-rounds" id="bondBattleStrategyRounds"></div>
+        <div class="strategy-lowhp">
+          <span>气血低于</span>
+          <input type="number" id="bondBattleStrategyLowHpPct" min="1" max="100" step="1" value="30">
+          <span>% 时，立刻使用</span>
+          <select id="bondBattleStrategyLowHpSkill"></select>
+        </div>
+      </div>
+      <div class="strategy-foot">
+        <button type="button" id="bondBattleStrategySaveBtn" class="main-btn">保 存 策 略</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="studyOverlay" class="strategy-overlay">
+    <div class="strategy-box">
+      <div class="strategy-head">
+        <span>玄 览 通 微</span>
+        <button type="button" id="studyCloseBtn">关闭</button>
+      </div>
+      <div class="strategy-body">
+        <div class="strategy-hint">每点见微知著提升1%的修炼速度，并降低难度要求、提升每重收益。钻研速度受悟性、武学属性、内力影响。武功的难度系数越高，钻研越慢。钻研同一门武功的累计时间越长，见微知著的总量还会进一步提升（不会随着切换钻研对象而清空）</div>
+        <div id="studyList" class="study-list"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="core.js"></script>
+<script src="items.js"></script>
+<script src="npcs.js"></script>
+<script src="npclogic.js"></script>
+<script src="skills.js"></script>
+<script src="bag.js"></script>
+<script src="fishing.js"></script>
+<script src="cooking.js"></script>
+<script src="training.js"></script>
+<script src="neili.js"></script>
+<script src="story.js"></script>
+<script src="battle-render.js"></script>
+<script src="battle-strategy.js"></script>
+<script src="battle.js"></script>
+<script src="battle-spar.js"></script>
+<script src="battle-events.js"></script>
+<script src="dream.js"></script>
+<script src="offline.js"></script>
+<script src="skillcards.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
