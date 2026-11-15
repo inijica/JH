@@ -17,7 +17,7 @@ let lastOfflineReport = null;
 
 /* 设置界面的「离线收益」开关：默认开启，随存档保存 */
 function offlineGainsEnabled() {
-  return player.offlineEarnings !== false;
+  return player.offlineEarnings !== true;
 }
 
 function fmtDurationCN(sec) {
