@@ -57,7 +57,7 @@ game.js               ← 启动逻辑必须最后
 | battle-spar.js | `startSpar`、切磋奖励、NPC 敌人构建、`getActiveTrainingSkills` | 切磋 |
 | battle-events.js | 李乾元切磋事件（剧情/暂停恢复/书童参战/气滞） | 战斗事件 |
 | dream.js | 入梦界面、五狗屠龙阵、连携、首通奖励 | 入梦 |
-| offline.js | 离线收益/报告 | 离线 |
+| offline.js | 离线奖励时间 / 2 倍速时钟 | 离线 / 加速 |
 | skillcards.js | 武功/技艺卡片文案与渲染 | 技能卡 |
 | game.js | 主流程/角色创建/剧情/羁绊/存档/启动/事件 **(大，禁整读)** | 流程/存档 |
 
@@ -80,7 +80,7 @@ game.js               ← 启动逻辑必须最后
 | 切磋入口/奖励 | battle-spar.js |
 | 战斗事件/剧情 | battle-events.js |
 | 入梦挑战/奖励 | dream.js |
-| 离线收益 | offline.js |
+| 离线奖励时间 / 加速 | offline.js |
 | 存档/重置/羁绊 | game.js |
 | 样式 | style.css（实际文件名以 index.html 为准） |
 

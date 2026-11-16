@@ -98,7 +98,7 @@ const battleEngine = {
 };
 
 function startBattleEngine() {
-  battleEngine.lastAt = Date.now();
+  battleEngine.lastAt = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   battleEngine.pending = 0;
   if (battleEngine.timerId) return;
   battleEngine.timerId = setInterval(battleTick, BATTLE_TICK_MS);
@@ -171,7 +171,7 @@ function buildPlayerFighter() {
   if (huoLv >= 5) {
     f.huomaiLayers = 1;
     f.huomaiInterval = getHuomaiLayerInterval(huoLv) * 1000;
-    f.huomaiNextAt = Date.now() + f.huomaiInterval;
+    f.huomaiNextAt = (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now()) + f.huomaiInterval;
     f.huomaiRegenPerLayer = getHuomaiRegenPerLayer(getTotalMedicine());
     f.huomaiSpeedPerLayer = getHuomaiSpeedPerLayer(huoLv, getTotalMedicine());
   }
@@ -206,7 +206,7 @@ function buildBondCompanionFighter() {
     maxHp,
     speed: getBondSpeed() * boost,
     con,
-    neiLi: (getBondNeiLi() + extraStats.neili) * boost,
+    neiLi: getBondNeiLi() * boost,
     fist: (BOND_CHAR.fist + extraStats.fist) * boost,
     blade: (BOND_CHAR.blade + extraStats.blade) * boost,
     sword: (BOND_CHAR.sword + extraStats.sword) * boost,
@@ -820,7 +820,7 @@ function doJinzhen(e, injured) {
   const who = lowest.isPlayer ? '你' : lowest.name;
   addLog(`【金针渡穴】${e.name} 取出金针，为${who}疏通经络，恢复 ${fmtNum(healed)} 点气血。`, 'win');
   shakeCard(lowest);
-  e.stunUntil = Date.now() + 3000;
+  e.stunUntil = (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now()) + 3000;
   e.bar = 0;
   addLog(`【金针渡穴】${e.name} 收针调息，三息之内不再动作。`, '');
 }
@@ -906,7 +906,7 @@ function doEnemyAttack(e) {
   if (e.attack && e.attack.bleed && target.hp > 0) {
     const bleedHits = Math.max(1, Number(e.attack.hits) || 1);
     target.bleedStacks = Math.floor((Number(target.bleedStacks) || 0) + bleedHits);
-    if (!target.bleedNextAt) target.bleedNextAt = Date.now() + 1000;
+    if (!target.bleedNextAt) target.bleedNextAt = (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now()) + 1000;
     addLog(`【流血】${who}被${e.attack.name}咬中，流血叠加至 ${target.bleedStacks} 层。`, 'dmg');
   }
 
@@ -1168,7 +1168,7 @@ function battleTick() {
     return;
   }
 
-  const now = Date.now();
+  const now = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   let elapsed = (now - battleEngine.lastAt) / 1000;
   if (!(elapsed > 0)) elapsed = 0;
   battleEngine.lastAt = now;
@@ -1239,15 +1239,14 @@ function battleStep(dt) {
     }
   }
 
+  const nowSt = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+
   if (hasJieniu()) {
-    const now = Date.now();
-    if (now - battle.lastPozhanAt >= 2000) {
-      battle.lastPozhanAt = now;
+    if (nowSt - battle.lastPozhanAt >= 2000) {
+      battle.lastPozhanAt = nowSt;
       battle.pozhan = Math.min(10, battle.pozhan + 1);
     }
   }
-
-  const nowSt = Date.now();
 
   /* 震山拳百重：【撼山势】每秒自动叠加一层 */
   {
@@ -1363,8 +1362,8 @@ function battleStep(dt) {
   }
 
   for (const e of battle.enemies) {
-    if (e && e.haoranNextAt && !e.haoranSealed && !battle.over && Date.now() >= e.haoranNextAt) {
-    e.haoranNextAt = Date.now() + 5000;
+    if (e && e.haoranNextAt && !e.haoranSealed && !battle.over && nowSt >= e.haoranNextAt) {
+    e.haoranNextAt = nowSt + 5000;
     e.haoranLayers = (Number(e.haoranLayers) || 0) + 1;
     const shield = e.haoranLayers * HAORAN_SHIELD_PER_LAYER - (Number(e.haoranAccum) || 0);
     addLog(`【浩然养气诀】${e.name} 气机再沉，【浩然气】至 ${e.haoranLayers} 层（护盾 ${fmtNum(shield)} 点）`, '');

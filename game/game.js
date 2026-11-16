@@ -68,6 +68,8 @@ const player = {
   cookCount: 0,
   bonusHpRegen: 0,
   offlineEarnings: true,
+  offlineBonusMs: 0,
+  offlineBonusPaused: false,
   dream: { cleared: {} },
   teachCd: {},
   maxHp: 0,
@@ -287,9 +289,9 @@ function hasJieniu() {
 
 /* 烹饪系统见 cooking.js */
 /* 武功修炼见 training.js */
-let lastStudyTickAt = Date.now();
+let lastStudyTickAt = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
 setInterval(()=>{
-  const studyNow = Date.now();
+  const studyNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   const studyDt = Math.max(0, (studyNow - lastStudyTickAt) / 1000);
   lastStudyTickAt = studyNow;
   studyTick(studyDt);
@@ -297,6 +299,7 @@ setInterval(()=>{
   bondNeiLiTick();
   bondCultivationTick();
   updateTrainingUI();
+  if (typeof updateOfflineBonusUI === 'function') updateOfflineBonusUI();
   if (!$('skillTab').classList.contains('hidden')) renderSkills();
   const bt = $('bondTab');
   if (bt && !bt.classList.contains('hidden')) renderBondPanel();
@@ -311,6 +314,7 @@ document.addEventListener('visibilitychange', () => {
   bondCultivationTick();
   updateTrainingUI();
   updateNeiLiDisplays();
+  if (typeof updateOfflineBonusUI === 'function') updateOfflineBonusUI();
 });
 
 /* 内力与活脉见 neili.js */
@@ -345,6 +349,28 @@ function updateBuSuzhikeNpc() {
   el.style.display = show ? '' : 'none';
 }
 
+/* 白衣怪人战后：裴文秀出现在你的家，交谈后解锁启程 */
+function updatePeiWenxiuHomeNpc() {
+  const el = $('npcPeiWenxiuHome');
+  if (!el) return;
+  const show = !!storyFlags.peiStoryDone && !storyFlags.peiPostTalkDone && !storyFlags.leftVillage;
+  el.style.display = show ? '' : 'none';
+}
+
+function updateDepartBtn() {
+  const btn = $('departBtn');
+  if (!btn) return;
+  const show = !!storyFlags.departUnlocked && !storyFlags.leftVillage;
+  btn.style.display = show ? '' : 'none';
+}
+
+function updateMapView() {
+  const zj = $('zhaojiaMap');
+  const cm = $('carriageMap');
+  if (zj) zj.style.display = storyFlags.leftVillage ? 'none' : '';
+  if (cm) cm.style.display = storyFlags.leftVillage ? '' : 'none';
+}
+
 function renderMainTab() {
   const sv = $('storyView'), vv = $('villageView'), dv = $('dialogView');
   if (!sv) return;
@@ -352,11 +378,15 @@ function renderMainTab() {
   vv.style.display = mainView === 'village' ? 'flex' : 'none';
   dv.style.display = mainView === 'dialog' ? 'flex' : 'none';
   if (mainView === 'story') renderStory();
+  updateMapView();
   updateSidePanel();
   updateTrainingUI();
   updateFishingBtn();
   updateXiaPuyingHomeNpc();
   updateBuSuzhikeNpc();
+  updatePeiWenxiuHomeNpc();
+  updateDepartBtn();
+  updateLiQianyuanNpc();
 }
 
 function updateSidePanel() {
@@ -404,7 +434,19 @@ const storyFlags = {
   peiAskedLotus: false,
   peiSparWinBond: false,
   peiLeaveBond: false,
-  peiStoryDone: false
+  peiStoryDone: false,
+  peiPostTalkDone: false,
+  departUnlocked: false,
+  leftVillage: false,
+  farewellTiezhu: false,
+  farewellShip: false,
+  farewellDaifu: false,
+  farewellDaifuJinzhen: false,
+  farewellLiQianyuan: false,
+  farewellShutong: false,
+  farewellShutongExtort: false,
+  carriagePeiAboutBond: false,
+  carriagePeiLotusBond: false
 };
 
 let pendingLuoyingHint = false;
@@ -477,7 +519,7 @@ function gainXiaStoryBond(delta) {
 
 /* 裴文秀尚无羁绊面板，先记录数值并写入情报日志；flagKey 用于只发一次 */
 function gainPeiStoryBond(delta, flagKey) {
-  if (flagKey && storyFlags[flagKey]) return;
+  if (flagKey && storyFlags[flagKey]) return false;
   if (flagKey) storyFlags[flagKey] = true;
   const add = Number(delta) || 0;
   player.bondPeiWenxiu = Math.max(0, (Number(player.bondPeiWenxiu) || 0) + add);
@@ -486,6 +528,7 @@ function gainPeiStoryBond(delta, flagKey) {
     add > 0 ? 'good' : ''
   );
   saveGame();
+  return true;
 }
 
 function showDialogNode(id) {
@@ -548,14 +591,28 @@ function showDialogNode(id) {
     updateXiaPuyingHomeNpc();
     saveGame();
   }
+  const peiBondAlreadyClaimed = !!(node.peiBondDelta && node.peiBondFlag && storyFlags[node.peiBondFlag]);
   if (node.peiBondDelta) {
     gainPeiStoryBond(node.peiBondDelta, node.peiBondFlag);
   }
   if (node.finishPeiStory && !storyFlags.peiStoryDone) {
     storyFlags.peiStoryDone = true;
     updateBuSuzhikeNpc();
+    updatePeiWenxiuHomeNpc();
     saveGame();
     addIntel('天残与孟清秋带着莲教众人离去，裴文秀仍在你的身旁。', '');
+  }
+  if (node.finishPeiPostTalk && !storyFlags.peiPostTalkDone) {
+    storyFlags.peiPostTalkDone = true;
+    storyFlags.departUnlocked = true;
+    updatePeiWenxiuHomeNpc();
+    updateDepartBtn();
+    updateLiQianyuanNpc();
+    saveGame();
+    addIntel('你们商定启程前往京城，离开赵家村前可先向村民们道别。', 'good');
+  }
+  if (node.farewellEffect) {
+    applyFarewellEffect(node.farewellEffect);
   }
 
   if (node.unlockFishing && !storyFlags.fishingUnlocked) {
@@ -596,7 +653,11 @@ function showDialogNode(id) {
   }
 
   const rawText = typeof node.text === 'function' ? node.text() : node.text;
-  const { display: text, notices } = splitDialogNotices(rawText);
+  const split = splitDialogNotices(rawText);
+  const text = split.display;
+  const notices = peiBondAlreadyClaimed
+    ? split.notices.filter(n => !n.includes('裴文秀羁绊'))
+    : split.notices;
   if (node.grantItem && !storyFlags.chuilunObtained) {
     addItem(node.grantItem, 1);
     storyFlags.chuilunObtained = true;
@@ -806,16 +867,21 @@ if (npcShipEl) npcShipEl.addEventListener('click', () => showDialogNode('npcShip
 const npcDaifuEl = $('npcZhaoDaifu');
 if (npcDaifuEl) npcDaifuEl.addEventListener('click', () => showDialogNode('npcDaifu'));
 
-/* 李乾元：已领悟玄览通微后，选项彻底消失，不再出现在乾元书舍 */
+/* 李乾元：已领悟玄览通微后暂时隐藏；启程解锁后在离开赵家村前可回书院道别 */
 function updateLiQianyuanNpc() {
   const el = $('npcLiQianyuan');
   if (!el) return;
-  const visible = storyFlags.liQianyuanUnlocked && !storyFlags.xuanlanLearned;
+  const visible = !storyFlags.leftVillage && ((storyFlags.liQianyuanUnlocked && !storyFlags.xuanlanLearned) || !!storyFlags.departUnlocked);
   el.style.display = visible ? '' : 'none';
 }
 const npcLiQianyuanEl = $('npcLiQianyuan');
 if (npcLiQianyuanEl) {
   npcLiQianyuanEl.addEventListener('click', () => {
+    if (storyFlags.leftVillage) return;
+    if (storyFlags.departUnlocked) {
+      showDialogNode('npcLiQianyuan');
+      return;
+    }
     if (!storyFlags.liQianyuanUnlocked || storyFlags.xuanlanLearned) return;
     if (storyFlags.liQianyuanTalked && storyFlags.liQianyuanDefeated) {
       showDialogNode('lqAfterWin');
@@ -825,6 +891,145 @@ if (npcLiQianyuanEl) {
   });
 }
 updateLiQianyuanNpc();
+
+function applyFarewellEffect(kind) {
+  if (kind === 'tiezhu' && !storyFlags.farewellTiezhu) {
+    storyFlags.farewellTiezhu = true;
+    player.root = (Number(player.root) || 0) + 2;
+    player.bonusHpRegen = (Number(player.bonusHpRegen) || 0) + 10;
+    addIntel('向赵铁柱道别，获赠温养气血的玉佩（根骨 +2，气血恢复 +10）。', 'good');
+    updateAttrUI();
+    saveGame();
+    return;
+  }
+  if (kind === 'ship' && !storyFlags.farewellShip) {
+    storyFlags.farewellShip = true;
+    player.neiLi = (Number(player.neiLi) || 0) + 30;
+    addIntel('向赵十二道别，获赠蛇胆酒（内力 +30）。', 'good');
+    updateAttrUI();
+    updateNeiLiDisplays();
+    saveGame();
+    return;
+  }
+  if (kind === 'daifu' && !storyFlags.farewellDaifu) {
+    storyFlags.farewellDaifu = true;
+    player.luck = (Number(player.luck) || 0) + 1;
+    player.medicine = (Number(player.medicine) || 0) + 20;
+    if (!hasJinzhenTechnique()) {
+      storyFlags.farewellDaifuJinzhen = true;
+      learnJinzhenTechnique();
+      addIntel('向赵大夫道别，聆听最后一次教诲（定力 +1，医术 +20，学会金针渡穴）。', 'good');
+    } else {
+      storyFlags.farewellDaifuJinzhen = false;
+      addIntel('向赵大夫道别，聆听最后一次教诲（定力 +1，医术 +20）。', 'good');
+    }
+    updateAttrUI();
+    saveGame();
+    return;
+  }
+  if (kind === 'liQianyuan' && !storyFlags.farewellLiQianyuan) {
+    storyFlags.farewellLiQianyuan = true;
+    player.comp = (Number(player.comp) || 0) + 3;
+    player.luck = (Number(player.luck) || 0) + 1;
+    addIntel('向李乾元道别，获益良多（悟性 +3，定力 +1）。', 'good');
+    updateAttrUI();
+    saveGame();
+    return;
+  }
+  if (kind === 'shutong' && !storyFlags.farewellShutong) {
+    storyFlags.farewellShutong = true;
+    addItem('wuxueXinde', 1);
+    renderBag();
+    addIntel('向书童“道别”，得到了一本【武学心得】。', 'good');
+    saveGame();
+    return;
+  }
+  if (kind === 'shutongExtort' && !storyFlags.farewellShutongExtort) {
+    storyFlags.farewellShutongExtort = true;
+    addItem('wuxueXinde', 1);
+    renderBag();
+    addIntel('再次向书童勒索，又得到了一本【武学心得】。', 'good');
+    saveGame();
+  }
+}
+
+function openDepartModal() {
+  if (!storyFlags.departUnlocked || storyFlags.leftVillage) return;
+  const modal = $('departModal');
+  if (modal) modal.classList.add('show');
+}
+
+function closeDepartModal() {
+  const modal = $('departModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function confirmDepart() {
+  closeDepartModal();
+  if (!storyFlags.departUnlocked || storyFlags.leftVillage) return;
+  storyFlags.leftVillage = true;
+  if (typeof cancelFishing === 'function') cancelFishing();
+  if (typeof cookingState !== 'undefined' && cookingState && cookingState.running) {
+    cookingState.running = false;
+    cookingState.selected = {};
+    cookingState.pending = [];
+    const ov = $('cookingOverlay');
+    if (ov) ov.classList.remove('show');
+  }
+  if (player.trainingActivity && player.trainingActivity !== 'internal') {
+    stopTraining();
+  }
+  updateMapView();
+  updateDepartBtn();
+  updatePeiWenxiuHomeNpc();
+  updateLiQianyuanNpc();
+  updateTrainingUI();
+  saveGame();
+  addIntel('你与夏扑萤、裴文秀乘上马车，离开赵家村前往京城。', 'good');
+  showToast('已启程离开赵家村，前往京城');
+}
+
+const npcPeiWenxiuHomeEl = $('npcPeiWenxiuHome');
+if (npcPeiWenxiuHomeEl) {
+  npcPeiWenxiuHomeEl.addEventListener('click', () => {
+    if (!storyFlags.peiStoryDone || storyFlags.peiPostTalkDone || storyFlags.leftVillage) return;
+    showDialogNode('peiPostStart');
+  });
+}
+
+const departBtnEl = $('departBtn');
+if (departBtnEl) {
+  departBtnEl.addEventListener('click', openDepartModal);
+}
+const departConfirmBtnEl = $('departConfirmBtn');
+if (departConfirmBtnEl) {
+  departConfirmBtnEl.addEventListener('click', confirmDepart);
+}
+const departCancelBtnEl = $('departCancelBtn');
+if (departCancelBtnEl) {
+  departCancelBtnEl.addEventListener('click', closeDepartModal);
+}
+const departModalEl = $('departModal');
+if (departModalEl) {
+  departModalEl.addEventListener('click', (e) => {
+    if (e.target === departModalEl) closeDepartModal();
+  });
+}
+
+const npcXiaPuyingCarriageEl = $('npcXiaPuyingCarriage');
+if (npcXiaPuyingCarriageEl) {
+  npcXiaPuyingCarriageEl.addEventListener('click', () => {
+    if (!storyFlags.leftVillage) return;
+    showDialogNode('carriageXia');
+  });
+}
+const npcPeiWenxiuCarriageEl = $('npcPeiWenxiuCarriage');
+if (npcPeiWenxiuCarriageEl) {
+  npcPeiWenxiuCarriageEl.addEventListener('click', () => {
+    if (!storyFlags.leftVillage) return;
+    showDialogNode('carriagePei');
+  });
+}
 
 const npcXiaPuyingHomeEl = $('npcXiaPuyingHome');
 if (npcXiaPuyingHomeEl) {
@@ -838,7 +1043,7 @@ if (npcXiaPuyingHomeEl) {
 function learnXuanlan() {
   if (storyFlags.xuanlanLearned) return;
   storyFlags.xuanlanLearned = true;
-  lastStudyTickAt = Date.now();
+  lastStudyTickAt = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   updateLiQianyuanNpc();
   updateXiaPuyingHomeNpc();
   saveGame();
@@ -1050,16 +1255,17 @@ function resetBondChar() {
 function getBondGrowth() {
   return ensureBondChar().growth;
 }
-function getBondRoot() { return BOND_CHAR.root + getBondGrowth().root; }
-function getBondComp() { return BOND_CHAR.comp + getBondGrowth().comp; }
-function getBondLuck() { return BOND_CHAR.luck + getBondGrowth().luck; }
+function getBondRoot() { return BOND_CHAR.root + getBondGrowth().root + getBondExtraMartialStats().root; }
+function getBondComp() { return BOND_CHAR.comp + getBondGrowth().comp + getBondExtraMartialStats().comp; }
+function getBondLuck() { return BOND_CHAR.luck + getBondGrowth().luck + getBondExtraMartialStats().luck; }
 
 /* 50 羁绊解锁：夏扑萤体魄 += 青鸢飞纵重数 */
 function getBondCon() {
   const base = Number(BOND_CHAR.con) || 0;
-  if (getBondValue() < 50) return base;
   const b = ensureBondChar();
-  return base + (Number(b.levels.qingyuan) || 0);
+  const qyCon = getBondValue() >= 50 ? (Number(b.levels.qingyuan) || 0) : 0;
+  const ex = getBondExtraMartialStats();
+  return (base + qyCon + ex.con) * ex.conMult;
 }
 
 /* 按小时推进一次成长；返回该次增长量 */
@@ -1080,7 +1286,7 @@ function growBondStats(hours = 1) {
 
 function getBondNeiLi() {
   const b = ensureBondChar();
-  return BOND_CHAR.neiLiBase + (Number(b.neiLi) || 0) + getBondNeiLiBonus();
+  return BOND_CHAR.neiLiBase + (Number(b.neiLi) || 0) + getBondNeiLiBonus() + getBondExtraMartialStats().neili;
 }
 
 function getBondNeiLiBonus() {
@@ -1094,13 +1300,18 @@ function getBondNeiLiBonus() {
 
 function getBondNeiLiRatePerMin() {
   const b = ensureBondChar();
-  return calcNeiLiRate(b.levels.tanafa, getBondLuck()) * (1 + getBondValue() / 500);
+  let perMin = calcNeiLiRate(b.levels.tanafa, getBondLuck());
+  const huomaiLv = Math.floor(Number(b.levels.huomai) || 0);
+  if (huomaiLv > 0 && typeof HUOMAI_RATE_BASE === 'number' && typeof HUOMAI_RATE_PER_LEVEL === 'number') {
+    perMin += (HUOMAI_RATE_BASE + (huomaiLv - 1) * HUOMAI_RATE_PER_LEVEL) * (1 + Math.max(0, getBondLuck()) * 0.025);
+  }
+  return perMin * (1 + getBondValue() / 500);
 }
 
 function getBondSpeed() {
   const b = ensureBondChar();
   const lv = b.levels.qingyuan;
-  return BOND_CHAR.speed + lv * 0.02 + getQingyuanSpeedBonus(lv);
+  return BOND_CHAR.speed + lv * 0.02 + getQingyuanSpeedBonus(lv) + getBondExtraMartialStats().speed;
 }
 
 /* 夏扑萤自身的暗器（不含玩家羁绊反哺） */
@@ -1152,10 +1363,10 @@ function rollBondTrainingSkillId() {
   return weighted[weighted.length - 1].id;
 }
 
-let lastBondNeiLiTime = Date.now();
+let lastBondNeiLiTime = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
 
 function bondNeiLiTick() {
-  const now = Date.now();
+  const now = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   const dt = Math.max(0, (now - lastBondNeiLiTime) / 1000);
   lastBondNeiLiTime = now;
   if (!player.surname) return;
@@ -1247,7 +1458,7 @@ function makeBondSparEnemy() {
     atk: 0,
     speed,
     con,
-    neiLi: neiLi + extraStats.neili,
+    neiLi: neiLi,
     fist: fist + extraStats.fist,
     blade: blade + extraStats.blade,
     sword: sword + extraStats.sword,
@@ -1293,8 +1504,9 @@ function startBondSpar() {
   battle.over = false;
   battle.logs = [];
   battle.pozhan = 0;
-  battle.lastPozhanAt = Date.now();
-  battle.jiumaiNextAt = Date.now() + JIUMAI_DECAY_MS;
+  const bondSparNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+  battle.lastPozhanAt = bondSparNow;
+  battle.jiumaiNextAt = bondSparNow + JIUMAI_DECAY_MS;
   battle.sparNpcId = BOND_SPAR_ID;
   battle.dreamId = '';
   battle.storyBattleId = '';
@@ -1436,8 +1648,9 @@ function prepareStoryBattle() {
   battle.over = false;
   battle.logs = [];
   battle.pozhan = 0;
-  battle.lastPozhanAt = Date.now();
-  battle.jiumaiNextAt = Date.now() + JIUMAI_DECAY_MS;
+  const storyBattleNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+  battle.lastPozhanAt = storyBattleNow;
+  battle.jiumaiNextAt = storyBattleNow + JIUMAI_DECAY_MS;
   battle.sparNpcId = '';
   battle.dreamId = '';
   battle.forfeited = false;
@@ -1612,32 +1825,63 @@ function handleStoryBattleEnd(result) {
   saveGame();
 }
 
-/* 计算夏扑萤通过额外传授武功获得的战斗属性加成 */
+/* 计算羁绊角色通过额外传授武功获得的属性加成（不吃玩家见微知著倍率） */
 function getBondExtraMartialStats() {
   const b = ensureBondChar();
-  const extra = { fist: 0, sword: 0, blade: 0, changbing: 0, qimen: 0, hidden: 0, neili: 0 };
+  const extra = {
+    fist: 0, sword: 0, blade: 0, changbing: 0, qimen: 0, hidden: 0,
+    neili: 0, con: 0, root: 0, comp: 0, luck: 0, speed: 0, conMult: 1
+  };
   const mine = Array.isArray(player.skills) ? player.skills : [];
 
   /* 初始三门武功各自已有专属加成，这里只算额外传授的 */
   Object.keys(b.levels).forEach(id => {
     if (BOND_SKILL_ORDER.includes(id)) return;
-    const lv = Number(b.levels[id]) || 0;
+    const lv = Math.floor(Number(b.levels[id]) || 0);
     if (lv <= 0) return;
+
+    if (id === 'zhenshan') {
+      extra.fist += lv * 3 + (lv >= 100 ? 1000 : 0);
+      if (typeof getWangbaConBonus === 'function') extra.con += getWangbaConBonus(lv);
+      if (typeof getWangbaRootBonus === 'function') extra.root += getWangbaRootBonus(lv);
+      return;
+    }
+    if (id === 'jiusi') {
+      extra.sword += lv * 3 + (lv >= 5 ? 10 : 0) + (lv >= 10 ? 20 : 0) + (lv >= 50 ? 50 : 0) + (lv >= 100 ? 1000 : 0);
+      if (typeof getJiusiCompBonus === 'function') extra.comp += getJiusiCompBonus(lv);
+      if (typeof getJiusiNeiLiBonus === 'function') extra.neili += getJiusiNeiLiBonus(lv);
+      return;
+    }
+    if (id === 'paodingDao') {
+      extra.blade += lv * 3 + (lv >= 5 ? 15 : 0) + (lv >= 50 ? 50 : 0) + (lv >= 100 ? 1000 : 0);
+      if (typeof getPaodingDaoConBonus === 'function') extra.con += getPaodingDaoConBonus(lv);
+      if (typeof getPaodingDaoCompBonus === 'function') extra.comp += getPaodingDaoCompBonus(lv);
+      if (typeof getPaodingDaoSpeedBonus === 'function') extra.speed += getPaodingDaoSpeedBonus(lv);
+      return;
+    }
+    if (id === 'qiangshen') {
+      extra.con += 2 + lv * 2 + (lv >= 10 ? 10 : 0) + (lv >= 30 ? 30 : 0) + (lv > 50 ? (lv - 50) * 2 : 0);
+      if (typeof getQiangshenRootBonus === 'function') extra.root += getQiangshenRootBonus(lv);
+      if (lv >= 100) extra.conMult *= 1.2;
+      return;
+    }
+    if (id === 'huomai') {
+      extra.root += Math.floor(lv / 5);
+      return;
+    }
+
     const playerSkill = mine.find(s => s && s.id === id);
-    if (!playerSkill) return;
+    if (!playerSkill || typeof skillMatchesCategory !== 'function') return;
 
-    /* 每 10 重 +10 点对应属性，内功每 10 重 +50 内力 */
-    const bonus = Math.floor(lv / 10) * 10;
-    if (bonus <= 0) return;
-    if (typeof skillMatchesCategory !== 'function') return;
-
-    if (skillMatchesCategory(playerSkill, '剑法')) extra.sword += bonus;
-    else if (skillMatchesCategory(playerSkill, '刀法')) extra.blade += bonus;
-    else if (skillMatchesCategory(playerSkill, '长兵')) extra.changbing += bonus;
-    else if (skillMatchesCategory(playerSkill, '奇门')) extra.qimen += bonus;
-    else if (skillMatchesCategory(playerSkill, '暗器')) extra.hidden += bonus;
-    else if (skillMatchesCategory(playerSkill, '招式')) extra.fist += bonus;
-    else if (playerSkill.type === '内功') extra.neili += bonus * 5;
+    if (skillMatchesCategory(playerSkill, '剑法')) extra.sword += lv * 3;
+    else if (skillMatchesCategory(playerSkill, '刀法')) extra.blade += lv * 3;
+    else if (skillMatchesCategory(playerSkill, '长兵')) extra.changbing += lv * 3;
+    else if (skillMatchesCategory(playerSkill, '奇门')) extra.qimen += lv * 3;
+    else if (skillMatchesCategory(playerSkill, '暗器')) extra.hidden += lv * 3;
+    else if (skillMatchesCategory(playerSkill, '招式')) extra.fist += lv * 3;
+    else if (playerSkill.type === '外功') extra.con += lv * 2;
+    else if (playerSkill.type === '内功') extra.neili += lv * 5;
+    else if (playerSkill.type === '轻功') extra.speed += lv * 0.02;
   });
 
   return extra;
@@ -1660,7 +1904,7 @@ function renderBondPanel() {
   set('bc-comp', fmtBondInt(getBondComp()));
   set('bc-luck', fmtBondInt(getBondLuck()));
   set('bc-con', fmtBondInt(getBondCon()));
-  set('bc-neili', fmtBondInt(getBondNeiLi() + extraStats.neili));
+  set('bc-neili', fmtBondInt(getBondNeiLi()));
   set('bc-speed', fmtDecimal(Math.round((Number(getBondSpeed()) || 0) * 100) / 100));
   set('bc-fist', fmtBondInt(BOND_CHAR.fist + extraStats.fist));
   set('bc-blade', fmtBondInt(BOND_CHAR.blade + extraStats.blade));
@@ -2224,7 +2468,7 @@ function saveGame() {
     storyFlags: storyFlags,
     intelLogs: intelLogs,
     lastActiveAt: Date.now(),
-    // 离开页面前正在做的事，供离线结算使用
+    // 离开页面前正在做的事，供重连恢复与奖励时间计算使用
     offline: {
       fishingActive: !!(fishing.running || fishing.nextStartAt > 0),
       fishingDuration: getFishingDuration(),
@@ -2340,6 +2584,9 @@ function loadGame() {
     if (typeof player.speed !== 'number') player.speed = 0.15;
     if (!Number.isFinite(Number(player.bonusHpRegen)) || Number(player.bonusHpRegen) < 0) player.bonusHpRegen = 0;
     if (typeof player.offlineEarnings !== 'boolean') player.offlineEarnings = true;
+    const savedBonusMs = Number(player.offlineBonusMs);
+    player.offlineBonusMs = Number.isFinite(savedBonusMs) && savedBonusMs > 0 ? savedBonusMs : 0;
+    player.offlineBonusPaused = Boolean(player.offlineBonusPaused);
     if (!player.dream || typeof player.dream !== 'object') player.dream = {};
     if (!player.dream.cleared || typeof player.dream.cleared !== 'object') player.dream.cleared = {};
     if (!player.npcLevels || typeof player.npcLevels !== 'object') player.npcLevels = {};
@@ -2395,17 +2642,39 @@ function loadGame() {
     ensureStrategy();
     ensureBondStrategy();
 
-    if (player.offlineEarnings === false) {
+    /* 取消原本的离线结算：将羁绊修炼/成长计时平移离线时长，避免重连后立刻补算离线期间的羁绊收益 */
+    if (pendingOffline && pendingOffline.ms > 0) {
       const now = Date.now();
-      player.bond.lastCultAt = now;
-      player.bond.lastGrowthAt = now;
+      if (Number.isFinite(Number(player.bond.lastCultAt)) && player.bond.lastCultAt > 0) {
+        player.bond.lastCultAt = Math.min(now, player.bond.lastCultAt + pendingOffline.ms);
+      } else {
+        player.bond.lastCultAt = now;
+      }
+      if (Number.isFinite(Number(player.bond.lastGrowthAt)) && player.bond.lastGrowthAt > 0) {
+        player.bond.lastGrowthAt = Math.min(now, player.bond.lastGrowthAt + pendingOffline.ms);
+      } else {
+        player.bond.lastGrowthAt = now;
+      }
     }
 
+    if (storyFlags.leftVillage) {
+      if (typeof cancelFishing === 'function') cancelFishing();
+      if (player.trainingActivity && player.trainingActivity !== 'internal') {
+        player.trainingActivity = '';
+        player.trainingInteractionEfficiency = 0;
+        player.trainingLastTick = 0;
+      }
+    }
+
+    updateMapView();
     updateFishingBtn();
     updateLuoyingBtn();
     updateLiQianyuanNpc();
     updateShutongNpc();
+    updateXiaPuyingHomeNpc();
     updateBuSuzhikeNpc();
+    updatePeiWenxiuHomeNpc();
+    updateDepartBtn();
     renderBag();
     renderBondPanel();
     return true;
@@ -2480,15 +2749,26 @@ function resetGame() {
     storyFlags.fishCookedBond = false;
     storyFlags.fishReviewDone = false;
     storyFlags.huomaiLearned = false;
-    storyFlags.xuanlanLearned = false;
-    storyFlags.homeTalkDone = false;
     storyFlags.homeTalkDone = false;
     storyFlags.peiAskedBreak = false;
     storyFlags.peiAskedLotus = false;
     storyFlags.peiSparWinBond = false;
     storyFlags.peiLeaveBond = false;
     storyFlags.peiStoryDone = false;
+    storyFlags.peiPostTalkDone = false;
+    storyFlags.departUnlocked = false;
+    storyFlags.leftVillage = false;
+    storyFlags.farewellTiezhu = false;
+    storyFlags.farewellShip = false;
+    storyFlags.farewellDaifu = false;
+    storyFlags.farewellDaifuJinzhen = false;
+    storyFlags.farewellLiQianyuan = false;
+    storyFlags.farewellShutong = false;
+    storyFlags.farewellShutongExtort = false;
+    storyFlags.carriagePeiAboutBond = false;
+    storyFlags.carriagePeiLotusBond = false;
     pendingLuoyingHint = false;
+    closeDepartModal();
     player.bondXiaPuying = 50;
     player.bondPeiWenxiu = 0;
     player.companionId = BOND_SPAR_ID;
@@ -2504,6 +2784,10 @@ function resetGame() {
     player.speed = 0.15;
     player.bonusHpRegen = 0;
     player.offlineEarnings = true;
+    player.offlineBonusMs = 0;
+    player.offlineBonusPaused = false;
+    if (typeof resetOfflineClock === 'function') resetOfflineClock();
+    if (typeof updateOfflineBonusUI === 'function') updateOfflineBonusUI();
     player.dream = { cleared: {} };
     player.npcLevels = {};
     player.sparCd = {};
@@ -2516,12 +2800,15 @@ function resetGame() {
     $('dialogText').innerHTML = '';
     $('dialogOptions').innerHTML = '';
     $('dialogOptions').classList.remove('show');
+    updateMapView();
     updateFishingBtn();
     updateLuoyingBtn();
     updateLiQianyuanNpc();
     updateShutongNpc();
     updateXiaPuyingHomeNpc();
     updateBuSuzhikeNpc();
+    updatePeiWenxiuHomeNpc();
+    updateDepartBtn();
     renderBag();
 
     intelLogs = [];
@@ -2566,6 +2853,9 @@ loadFontSettings();
 function renderSettings() {
   const toggle = $('offlineEarningsToggle');
   if (toggle) toggle.checked = player.offlineEarnings !== false;
+  const pauseToggle = $('offlineBonusPauseToggle');
+  if (pauseToggle) pauseToggle.checked = Boolean(player.offlineBonusPaused);
+  if (typeof updateOfflineBonusUI === 'function') updateOfflineBonusUI();
 }
 
 const offlineEarningsToggleEl = $('offlineEarningsToggle');
@@ -2573,7 +2863,26 @@ if (offlineEarningsToggleEl) {
   offlineEarningsToggleEl.addEventListener('change', () => {
     player.offlineEarnings = !!offlineEarningsToggleEl.checked;
     saveGame();
-    showToast(player.offlineEarnings ? '离线收益已开启' : '离线收益已关闭');
+    showToast(player.offlineEarnings ? '离线奖励时间已开启' : '离线奖励时间已关闭');
+  });
+}
+
+const offlineBonusPauseToggleEl = $('offlineBonusPauseToggle');
+if (offlineBonusPauseToggleEl) {
+  offlineBonusPauseToggleEl.addEventListener('change', () => {
+    if (typeof setOfflineBonusPaused === 'function') {
+      setOfflineBonusPaused(!!offlineBonusPauseToggleEl.checked);
+    } else {
+      player.offlineBonusPaused = !!offlineBonusPauseToggleEl.checked;
+      saveGame();
+    }
+  });
+}
+
+const offlineBonusBadgeEl = $('offlineBonusBadge');
+if (offlineBonusBadgeEl) {
+  offlineBonusBadgeEl.addEventListener('click', () => {
+    if (typeof toggleOfflineBonusPause === 'function') toggleOfflineBonusPause();
   });
 }
 
@@ -2690,6 +2999,18 @@ $('startBtn').addEventListener('click', () => {
   storyFlags.peiSparWinBond = false;
   storyFlags.peiLeaveBond = false;
   storyFlags.peiStoryDone = false;
+  storyFlags.peiPostTalkDone = false;
+  storyFlags.departUnlocked = false;
+  storyFlags.leftVillage = false;
+  storyFlags.farewellTiezhu = false;
+  storyFlags.farewellShip = false;
+  storyFlags.farewellDaifu = false;
+  storyFlags.farewellDaifuJinzhen = false;
+  storyFlags.farewellLiQianyuan = false;
+  storyFlags.farewellShutong = false;
+  storyFlags.farewellShutongExtort = false;
+  storyFlags.carriagePeiAboutBond = false;
+  storyFlags.carriagePeiLotusBond = false;
   pendingLuoyingHint = false;
 
   player.surname = surname;
@@ -2712,6 +3033,15 @@ $('startBtn').addEventListener('click', () => {
   player.neiLi = 0;
   player.bonusHpRegen = 0;
   player.offlineEarnings = true;
+  player.offlineBonusMs = 0;
+  player.offlineBonusPaused = false;
+  if (typeof resetOfflineClock === 'function') resetOfflineClock();
+  if (typeof updateOfflineBonusUI === 'function') updateOfflineBonusUI();
+  const startClk = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+  lastStudyTickAt = startClk;
+  lastBondNeiLiTime = startClk;
+  if (typeof lastNeiLiTime !== 'undefined') lastNeiLiTime = startClk;
+  if (typeof lastTrainingClockMs !== 'undefined') lastTrainingClockMs = 0;
   player.dream = { cleared: {} };
   player.teachCd = {};
   player.trainingActivity = '';
@@ -2745,10 +3075,15 @@ $('startBtn').addEventListener('click', () => {
   updateAttrUI();
   renderSkills();
   renderBondPanel();
+  updateMapView();
   updateFishingBtn();
   updateLuoyingBtn();
   updateLiQianyuanNpc();
   updateShutongNpc();
+  updateXiaPuyingHomeNpc();
+  updateBuSuzhikeNpc();
+  updatePeiWenxiuHomeNpc();
+  updateDepartBtn();
   switchTab('main');
 });
 
@@ -2827,6 +3162,11 @@ if (studyListEl) {
 function bootGame() {
   if (loadGame()) {
     const offlineReport = consumePendingOffline();
+    const bootClk = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+    lastStudyTickAt = bootClk;
+    lastBondNeiLiTime = bootClk;
+    if (typeof lastNeiLiTime !== 'undefined') lastNeiLiTime = bootClk;
+    if (typeof lastTrainingClockMs !== 'undefined') lastTrainingClockMs = 0;
     mainView = storyFinished ? 'village' : 'story';
     $('createScreen').classList.remove('active');
     $('gameScreen').classList.add('active');
@@ -2837,8 +3177,12 @@ function bootGame() {
     updateFishingBtn();
     updateLuoyingBtn();
     switchTab('main');
-    if (offlineReport) showOfflineReport(offlineReport);
+    if (offlineReport) {
+      if (typeof showOfflineBonusNotice === 'function') showOfflineBonusNotice(offlineReport);
+      else if (typeof showOfflineReport === 'function') showOfflineReport(offlineReport);
+    }
   }
+  if (typeof updateOfflineBonusUI === 'function') updateOfflineBonusUI();
   renderBattleIdle();
   renderBondPanel();
   renderIntel();

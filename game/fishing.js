@@ -29,7 +29,9 @@ function startFishing(plannedStartAt) {
   fishing.running = true;
   fishing.nextStartAt = 0;
   fishing.duration = getFishingDuration();
-  fishing.startAt = Number(plannedStartAt) > 0 ? Number(plannedStartAt) : Date.now();
+  fishing.startAt = Number(plannedStartAt) > 0
+    ? Number(plannedStartAt)
+    : (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now());
 
   const btn = $('fishingBtn');
   if (btn) {
@@ -51,8 +53,9 @@ function renderFishingProgress(pct) {
 function fishingLoop() {
   let guard = 0;
   while (guard++ < 20) {
+    const now = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
     if (fishing.running) {
-      const elapsed = Date.now() - fishing.startAt;
+      const elapsed = now - fishing.startAt;
       if (elapsed < fishing.duration) {
         renderFishingProgress(Math.min(100, elapsed / fishing.duration * 100));
         return;
@@ -62,12 +65,12 @@ function fishingLoop() {
       try {
         finishFishing(caughtAt);
       } finally {
+        const curNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
         const soak = caughtAt + 300;
-        fishing.nextStartAt = Math.min(soak, Date.now() + 300);
+        fishing.nextStartAt = Math.min(soak, curNow + 300);
       }
       continue;
     }
-    const now = Date.now();
     if (!fishing.nextStartAt || now < fishing.nextStartAt) return;
     const plannedStartAt = fishing.nextStartAt;
     fishing.nextStartAt = 0;
@@ -104,7 +107,7 @@ function finishFishing(caughtAt) {
     addFishingExp(result.expGained);
   }
   if (getFishingLevel() > oldLevel) result.levelUp = getFishingLevel();
-  showFishingResult(result, caughtAt);
+  showFishingResult(result, Date.now());
 
   if (result.type === 'catch' && !storyFlags.firstFishCaught) {
     storyFlags.firstFishCaught = true;
@@ -119,7 +122,8 @@ function finishFishing(caughtAt) {
 }
 
 function scheduleNextFishing(delay = 300) {
-  fishing.nextStartAt = Date.now() + delay;
+  const now = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+  fishing.nextStartAt = now + delay;
 }
 
 startFishingEngine();

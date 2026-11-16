@@ -173,7 +173,7 @@ function startCooking() {
 
   cookingState.pending = consumed;
   cookingState.running = true;
-  cookingState.startAt = Date.now();
+  cookingState.startAt = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
 
   const statusEl = $('cookingStatusText');
   if (statusEl) statusEl.textContent = '烹饪中……';
@@ -183,7 +183,8 @@ function startCooking() {
 function cookingLoop() {
   if (!cookingState.running) return;
   const recipe = COOK_RECIPES[cookingState.recipe];
-  const elapsed = Date.now() - cookingState.startAt;
+  const now = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+  const elapsed = now - cookingState.startAt;
   const pct = Math.min(100, elapsed / recipe.duration * 100);
   const fill = $('cookingProgressFill');
   if (fill) fill.style.width = pct + '%';

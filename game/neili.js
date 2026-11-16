@@ -103,7 +103,7 @@ function getNeiLiDR() { return getTotalNeiLi() * 0.5; }
 
 let lastNeiLiTime = Date.now();
 function neiLiTick() {
-  const now = Date.now();
+  const now = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   const dt = Math.max(0, (now - lastNeiLiTime) / 1000);
   lastNeiLiTime = now;
   if (!player.surname) return;

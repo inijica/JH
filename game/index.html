@@ -106,6 +106,7 @@
       <button data-tab="bond">羁绊</button>
       <button data-tab="dream">入梦</button>
       <button data-tab="settings">设置</button>
+      <button id="offlineBonusBadge" type="button" class="offline-bonus-badge" style="display:none" title="点击暂停/恢复奖励时间"></button>
     </div>
 
     <div class="game-body">
@@ -138,64 +139,89 @@
 
       <div id="villageView" style="display:none">
         <div class="village-view">
-          <div class="village-head">
-            <div class="village-name">赵 家 村</div>
-            <div class="village-intro">一座依山傍水的小村子，村民多以务农打铁为生。村口有棵老槐树，日子过得平淡而安稳。</div>
+          <div id="zhaojiaMap" class="village-view">
+            <div class="village-head">
+              <div class="village-name">赵 家 村</div>
+              <div class="village-intro">一座依山傍水的小村子，村民多以务农打铁为生。村口有棵老槐树，日子过得平淡而安稳。</div>
+            </div>
+            <div class="place-list">
+              <div class="place-card">
+                <div class="place-name">你 的 家</div>
+                <div class="place-desc">赵铁柱与何巧娘的家，屋子不大，却总有饭菜的香气。</div>
+                <div class="npc-row">
+                  <div class="npc-box npc-puying" id="npcXiaPuying">夏 扑 萤</div>
+                  <div class="npc-box npc-puying" id="npcXiaPuyingHome" style="display:none">夏 扑 萤</div>
+                  <div class="npc-box npc-mystery" id="npcBuSuzhike" data-tip="家门口忽然出现了一位不请自来的客人" style="display:none">不 速 之 客</div>
+                  <div class="npc-box npc-mystery" id="npcPeiWenxiuHome" data-tip="白衣怪人退去后，裴文秀正等着与你说话" style="display:none">裴 文 秀</div>
+                  <button type="button" id="departBtn" class="event" style="display:none">启 程</button>
+                </div>
+                <div class="training-actions">
+                  <button type="button" id="trainInternalBtn">打坐入定</button>
+                  <button type="button" id="trainDummyBtn">打木桩</button>
+                  <button type="button" id="trainPlumBtn">梅花桩</button>
+                </div>
+              </div>
+              <div class="place-card">
+                <div class="place-name">铁 匠 铺</div>
+                <div class="place-desc">赵铁柱打铁营生的地方，炉火终日不熄，叮当声能传半条街。</div>
+                <div class="npc-row">
+                  <div class="npc-box" id="npcZhaoTiezhu" data-tip="你和夏扑萤的养父，也是村里唯一的铁匠">赵 铁 柱</div>
+                </div>
+              </div>
+              <div class="place-card">
+                <div class="place-name">乾 元 书 舍</div>
+                <div class="place-desc">村中唯一的学堂，院中种着一株老梅，李先生平日里就在这里教书。</div>
+                <div class="npc-row">
+                  <div class="npc-box" id="npcLiQianyuan" data-tip="村里的教书先生，自三年前来到赵家村后便在此定居" style="display:none">李 乾 元</div>
+                  <div class="npc-box" id="npcShutong" data-tip="李乾元的书童，夏扑萤说可以揍他一顿来磨砺武艺" style="display:none">书 童</div>
+                </div>
+              </div>
+              <div class="place-card">
+                <div class="place-name">医 馆</div>
+                <div class="place-desc">村里唯一的大夫开的铺子，隔着老远就能闻到草药味。</div>
+                <div class="npc-row">
+                  <div class="npc-box" id="npcZhaoDaifu" data-tip="赵大夫，他的名字就叫赵大夫，白发苍苍，已至古稀">赵 大 夫</div>
+                </div>
+              </div>
+              <div class="place-card">
+                <div class="place-name">后 山</div>
+                <div class="place-desc">村后的连绵山林，野果野菜不少，也时常有野兽出没。</div>
+                <div class="npc-row">
+                  <div class="npc-box npc-puying" id="npcXiaPuyingHill" style="display:none">夏 扑 萤</div>
+                  <button type="button" id="luoyingBtn" class="event" style="display:none">落 英</button>
+                </div>
+                <div class="npc-row">
+                  <div class="npc-box" id="npcZhaoShip" data-tip="村里的猎户，做事毛毛躁躁的，但人还不错">赵 十 二</div>
+                </div>
+                <div class="training-actions">
+                  <button type="button" id="trainExternalBtn">瀑布锻体</button>
+                  <button type="button" id="fishingBtn" style="display:none">溪边垂钓</button>
+                  <button type="button" id="cookingOpenBtn" style="display:none">后山烹饪</button>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="place-list">
-            <div class="place-card">
-              <div class="place-name">你 的 家</div>
-              <div class="place-desc">赵铁柱与何巧娘的家，屋子不大，却总有饭菜的香气。</div>
-              <div class="npc-row">
-                <div class="npc-box npc-puying" id="npcXiaPuying">夏 扑 萤</div>
-                <div class="npc-box npc-puying" id="npcXiaPuyingHome" style="display:none">夏 扑 萤</div>
-                <div class="npc-box npc-mystery" id="npcBuSuzhike" data-tip="家门口忽然出现了一位不请自来的客人" style="display:none">不 速 之 客</div>
-              </div>
-              <div class="training-actions">
-                <button type="button" id="trainInternalBtn">打坐入定</button>
-                <button type="button" id="trainDummyBtn">打木桩</button>
-                <button type="button" id="trainPlumBtn">梅花桩</button>
-              </div>
+
+          <div id="carriageMap" class="village-view" style="display:none">
+            <div class="village-head">
+              <div class="village-name">马 车</div>
+              <div class="village-intro">一辆驶向京城的青篷马车，车轮辘辘，沿着官道一路向北。车外风光渐远，赵家村已被留在了群山之后。</div>
             </div>
-            <div class="place-card">
-              <div class="place-name">铁 匠 铺</div>
-              <div class="place-desc">赵铁柱打铁营生的地方，炉火终日不熄，叮当声能传半条街。</div>
-              <div class="npc-row">
-                <div class="npc-box" id="npcZhaoTiezhu" data-tip="你和夏扑萤的养父，也是村里唯一的铁匠">赵 铁 柱</div>
-              </div>
-            </div>
-            <div class="place-card">
-              <div class="place-name">乾 元 书 舍</div>
-              <div class="place-desc">村中唯一的学堂，院中种着一株老梅，李先生平日里就在这里教书。</div>
-              <div class="npc-row">
-                <div class="npc-box" id="npcLiQianyuan" data-tip="村里的教书先生，自三年前来到赵家村后便在此定居" style="display:none">李 乾 元</div>
-                <div class="npc-box" id="npcShutong" data-tip="李乾元的书童，夏扑萤说可以揍他一顿来磨砺武艺" style="display:none">书 童</div>
-              </div>
-            </div>
-            <div class="place-card">
-              <div class="place-name">医 馆</div>
-              <div class="place-desc">村里唯一的大夫开的铺子，隔着老远就能闻到草药味。</div>
-              <div class="npc-row">
-                <div class="npc-box" id="npcZhaoDaifu" data-tip="赵大夫，他的名字就叫赵大夫，白发苍苍，已至古稀">赵 大 夫</div>
-              </div>
-            </div>
-            <div class="place-card">
-              <div class="place-name">后 山</div>
-              <div class="place-desc">村后的连绵山林，野果野菜不少，也时常有野兽出没。</div>
-              <div class="npc-row">
-                <div class="npc-box npc-puying" id="npcXiaPuyingHill" style="display:none">夏 扑 萤</div>
-                <button type="button" id="luoyingBtn" class="event" style="display:none">落 英</button>
-              </div>
-              <div class="npc-row">
-                <div class="npc-box" id="npcZhaoShip" data-tip="村里的猎户，做事毛毛躁躁的，但人还不错">赵 十 二</div>
-              </div>
-              <div class="training-actions">
-                <button type="button" id="trainExternalBtn">瀑布锻体</button>
-                <button type="button" id="fishingBtn" style="display:none">溪边垂钓</button>
-                <button type="button" id="cookingOpenBtn" style="display:none">后山烹饪</button>
+            <div class="place-list">
+              <div class="place-card">
+                <div class="place-name">车 厢 内</div>
+                <div class="place-desc">车厢不算宽敞，却收拾得整洁舒适。夏扑萤时不时掀开车帘张望，裴文秀则安静地坐在对侧。</div>
+                <div class="npc-row">
+                  <div class="npc-box npc-puying" id="npcXiaPuyingCarriage" data-tip="正兴致勃勃地看着窗外的风景">夏 扑 萤</div>
+                  <div class="npc-box npc-mystery" id="npcPeiWenxiuCarriage" data-tip="此行的引路人，正闭目养神">裴 文 秀</div>
+                </div>
+                <div class="training-actions">
+                  <button type="button" id="trainInternalCarriageBtn">打坐入定</button>
+                </div>
               </div>
             </div>
           </div>
+
           <div class="training-status" id="trainingStatus">当前未开始修炼</div>
         </div>
       </div>
@@ -323,13 +349,24 @@
             <span id="fontSizeValue">110%</span>
           </div>
           <p class="setting-hint">默认字体固定不变，字号调整会自动保存。</p>
-          <div class="attr-subtitle">离 线 收 益</div>
+          <div class="attr-subtitle">离 线 奖 励 时 间</div>
           <div class="setting-row setting-toggle">
-            <div><strong>离线收益</strong><p class="setting-hint">关闭后，离开游戏期间不再结算内力、武功、垂钓等离线收益。</p></div>
+            <div><strong>离线加速</strong><p class="setting-hint">离开游戏后按离线时长 ÷ 2 累计奖励时间；奖励时间内游戏运行速度 ×2。关闭后不再新增累计奖励时间。</p></div>
             <label class="switch" for="offlineEarningsToggle">
               <input id="offlineEarningsToggle" type="checkbox" checked>
               <span class="switch-track"></span>
             </label>
+          </div>
+          <div class="setting-row setting-toggle" style="margin-top:6px">
+            <div><strong>暂停奖励时间</strong><p class="setting-hint">开启后暂停消耗奖励时间，奖励时间不再减少，游戏恢复 1 倍正常流速。</p></div>
+            <label class="switch" for="offlineBonusPauseToggle">
+              <input id="offlineBonusPauseToggle" type="checkbox">
+              <span class="switch-track"></span>
+            </label>
+          </div>
+          <div class="setting-row" style="margin-top:6px">
+            <div><strong>剩余奖励时间</strong><p class="setting-hint">奖励时间内全游戏以 2 倍速度运行，可跨次累加。</p></div>
+            <b id="offlineBonusSettingVal">0 秒</b>
           </div>
           <div class="attr-subtitle">存 档 管 理</div>
           <div class="setting-row setting-reset">
@@ -462,6 +499,17 @@
       <div class="bag-modal-desc" id="bondModalDesc"></div>
       <div id="bondModalBody"></div>
       <div class="bag-modal-actions" id="bondModalActions"></div>
+    </div>
+  </div>
+
+  <div id="departModal" class="bag-modal">
+    <div class="bag-modal-box">
+      <div class="bag-modal-title">启 程</div>
+      <div class="bag-modal-desc">离开赵家村之后无法再返回，在那之前可以先跟村民们道别，确定离开吗？</div>
+      <div class="bag-modal-actions">
+        <button type="button" id="departConfirmBtn">确定</button>
+        <button type="button" id="departCancelBtn">取消</button>
+      </div>
     </div>
   </div>
 

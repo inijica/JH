@@ -53,8 +53,9 @@ function startSpar(npcId) {
   battle.logs = [];
   battle.keepLogs = false;
   battle.pozhan = 0;
-  battle.lastPozhanAt = Date.now();
-  battle.jiumaiNextAt = Date.now() + JIUMAI_DECAY_MS;
+  const sparNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+  battle.lastPozhanAt = sparNow;
+  battle.jiumaiNextAt = sparNow + JIUMAI_DECAY_MS;
   battle.sparNpcId = npcId;
   battle.dreamId = '';
   battle.storyBattleId = '';
@@ -169,10 +170,11 @@ function makeSparEnemy(npcId) {
     isSpar: true
   };
 
+  const enemyNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   if (def.huomai) {
     enemy.huomaiLayers = 1;
     enemy.huomaiInterval = 5000;
-    enemy.huomaiNextAt = Date.now() + enemy.huomaiInterval;
+    enemy.huomaiNextAt = enemyNow + enemy.huomaiInterval;
     enemy.huomaiRegenPerLayer = (Number(st.medicine) || 0) / 50;
     enemy.huomaiSpeedPerLayer = 0;
   }
@@ -180,7 +182,7 @@ function makeSparEnemy(npcId) {
   if (def.haoran) {
     enemy.haoranLayers = 0;
     enemy.haoranAccum = 0;
-    enemy.haoranNextAt = Date.now() + 5000;
+    enemy.haoranNextAt = enemyNow + 5000;
   }
   return enemy;
 }

@@ -147,7 +147,7 @@ function makeDreamNpcEnemy(npcId) {
   if (def.huomai) {
     enemy.huomaiLayers = 1;
     enemy.huomaiInterval = 5000;
-    enemy.huomaiNextAt = Date.now() + enemy.huomaiInterval;
+    enemy.huomaiNextAt = (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now()) + enemy.huomaiInterval;
     enemy.huomaiRegenPerLayer = (Number(enemy.medicine) || 0) / 50;
     enemy.huomaiSpeedPerLayer = 0;
   }
@@ -337,8 +337,9 @@ function startDreamBattle(challengeId) {
   battle.over = false;
   battle.logs = [];
   battle.pozhan = 0;
-  battle.lastPozhanAt = Date.now();
-  battle.jiumaiNextAt = Date.now() + JIUMAI_DECAY_MS;
+  const dreamNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+  battle.lastPozhanAt = dreamNow;
+  battle.jiumaiNextAt = dreamNow + JIUMAI_DECAY_MS;
   battle.sparNpcId = '';
   battle.dreamId = def.id;
   battle.storyBattleId = '';

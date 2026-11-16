@@ -72,7 +72,7 @@ function initBattleStrategy() {
   battle.bondStrategyRemaining = player.bondStrategy.rounds.map(r => r.maxUses);
   /* 每场战斗开始时重置开场效果与自动叠层计时 */
   battle.startEffectsDone = false;
-  battle.lastHanShanAt = Date.now();
+  battle.lastHanShanAt = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
 }
 
 function tryLowHpStrategy() {

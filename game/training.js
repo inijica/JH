@@ -172,6 +172,8 @@ function getTrainingSkillForActivity() {
   if (!id) return null;
   return player.skills.find(x => x.id === id && skillMatchesCategory(x, cat)) || null;
 }
+let lastTrainingClockMs = 0;
+
 function startTraining(activity) {
   if (!TRAINING_ACTIVITY[activity]) return;
   if (battleActive()) {
@@ -182,6 +184,7 @@ function startTraining(activity) {
   player.trainingActivity = activity;
   player.trainingInteractionEfficiency = TRAINING_ACTIVITY[activity].interactionEfficiency;
   player.trainingLastTick = Date.now();
+  lastTrainingClockMs = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   const skill = getTrainingSkillForActivity();
   if (!skill) {
     player.trainingActivity = '';
@@ -192,6 +195,8 @@ function startTraining(activity) {
   document.querySelectorAll('.training-actions button').forEach(b=>b.classList.remove('active'));
   const btn = $(TRAINING_ACTIVITY[activity].btnId);
   if (player.trainingActivity && btn) btn.classList.add('active');
+  const carriageBtn = $('trainInternalCarriageBtn');
+  if (carriageBtn) carriageBtn.classList.toggle('active', player.trainingActivity === 'internal');
   saveGame();
   renderSkills();
 }
@@ -200,14 +205,16 @@ function stopTraining() {
   player.trainingActivity = '';
   player.trainingInteractionEfficiency = 0;
   player.trainingLastTick = 0;
+  lastTrainingClockMs = 0;
   document.querySelectorAll('.training-actions button').forEach(b => b.classList.remove('active'));
   updateTrainingUI();
 }
 function trainingTick() {
-  const now = Date.now();
-  if (!player.trainingLastTick) player.trainingLastTick = now;
-  const dt = Math.max(0, (now - player.trainingLastTick) / 1000);
-  player.trainingLastTick = now;
+  const now = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+  if (!lastTrainingClockMs) lastTrainingClockMs = now;
+  const dt = Math.max(0, (now - lastTrainingClockMs) / 1000);
+  lastTrainingClockMs = now;
+  player.trainingLastTick = Date.now();
   const skill = getTrainingSkillForActivity();
   if (!skill || !player.trainingActivity) return;
   const perMinute = getSkillTrainingExpPerMinute(
@@ -243,10 +250,14 @@ function updateTrainingUI() {
   }
 
   document.querySelectorAll('.training-actions button').forEach(b=>b.classList.toggle('active',
-    !!TRAINING_ACTIVITY[player.trainingActivity] && b.id === TRAINING_ACTIVITY[player.trainingActivity].btnId));
+    !!TRAINING_ACTIVITY[player.trainingActivity] &&
+    (b.id === TRAINING_ACTIVITY[player.trainingActivity].btnId ||
+      (player.trainingActivity === 'internal' && b.id === 'trainInternalCarriageBtn'))));
 }
 $('trainExternalBtn').addEventListener('click',()=>startTraining('external'));
 $('trainInternalBtn').addEventListener('click',()=>startTraining('internal'));
+const trainInternalCarriageBtnEl = $('trainInternalCarriageBtn');
+if (trainInternalCarriageBtnEl) trainInternalCarriageBtnEl.addEventListener('click',()=>startTraining('internal'));
 const trainDummyBtnEl = $('trainDummyBtn');
 if (trainDummyBtnEl) trainDummyBtnEl.addEventListener('click',()=>startTraining('dummy'));
 const trainPlumBtnEl = $('trainPlumBtn');
