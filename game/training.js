@@ -76,7 +76,7 @@ const TRAINING_ACTIVITY = {
 
 function getSkillExpNeed(level, skill) {
   const n = Math.max(1, Number(level) || 1);
-  const value = Math.pow(125 + 25 * n * (n-1), 1 + n / 150);
+  const value = Math.pow(150 + n * 50 + 15 * n * (n-1), 1 + n / 250);
   const base = Number.isFinite(value) ? value : Number.MAX_VALUE;
   if (base === Number.MAX_VALUE) return base;
   return base * getSkillDifficultyMultiplier(skill);
