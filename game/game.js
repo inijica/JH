@@ -1720,6 +1720,7 @@ function makePeiWenxiuEnemy() {
 /* 白衣怪人相关事件见 battle-events.js */
 
 function prepareStoryBattle() {
+  clearStoryBattleEndTimer();
   capturePreBattleAction();
   cancelFishing();
   stopTraining();
@@ -1884,10 +1885,17 @@ function peiWenxiuCounter(attacker) {
   if (!battle.over) checkBattleEnd();
 }
 
-/* battle.js 在胜/负结算后调用，自动从战斗界面返回剧情 */
-function handleStoryBattleEnd(result) {
-  const id = battle.storyBattleId;
-  if (!id) return;
+let storyBattleEndTimer = null;
+
+function clearStoryBattleEndTimer() {
+  if (storyBattleEndTimer) {
+    clearTimeout(storyBattleEndTimer);
+    storyBattleEndTimer = null;
+  }
+}
+
+function completeStoryBattleEnd(id, result) {
+  clearStoryBattleEndTimer();
   battle.storyBattleId = '';
   const whiteRobeWin = id === 'whiteRobe' && result === 'win';
   battle.whiteRobe = null;
@@ -1898,6 +1906,7 @@ function handleStoryBattleEnd(result) {
   battle.forfeited = false;
   battle.sparNpcId = '';
   battle.dreamId = '';
+  battle.lastWeirdPoisonAt = 0;
   battle.pozhan = 0;
   player.hp = player.maxHp;
   renderBattleIdle();
@@ -1911,6 +1920,24 @@ function handleStoryBattleEnd(result) {
     showDialogNode('peiRefuse');
   }
   saveGame();
+}
+
+/* battle.js 在胜/负结算后调用，自动从战斗界面返回剧情 */
+function handleStoryBattleEnd(result) {
+  const id = battle.storyBattleId;
+  if (!id) return;
+  if (id === 'peiWenxiu' && result === 'lose') {
+    if (storyBattleEndTimer) return;
+    addLog('2 秒后将自动返回剧情界面……', '');
+    updateBattleUI();
+    storyBattleEndTimer = setTimeout(() => {
+      storyBattleEndTimer = null;
+      if (battle.storyBattleId !== id) return;
+      completeStoryBattleEnd(id, result);
+    }, 2000);
+    return;
+  }
+  completeStoryBattleEnd(id, result);
 }
 
 /* 计算羁绊角色通过额外传授武功获得的属性加成（不吃玩家见微知著倍率） */
@@ -2946,6 +2973,7 @@ function resetGame() {
     intelLogs = [];
     renderIntel();
 
+    clearStoryBattleEndTimer();
     pauseBattle();
     battle.stage = 1;
     battle.enemies = [];
@@ -2954,6 +2982,7 @@ function resetGame() {
     battle.forfeited = false;
     battle.sparNpcId = '';
     battle.dreamId = '';
+    battle.storyBattleId = '';
     battle.whiteRobe = null;
     battle.lastWeirdPoisonAt = 0;
 
@@ -3101,6 +3130,7 @@ function applyImportedSave(data) {
     return false;
   }
 
+  clearStoryBattleEndTimer();
   pauseBattle();
   stopBattleEngine();
   battle.enemies = [];
@@ -3356,6 +3386,7 @@ $('battlePauseBtn').addEventListener('click', () => {
 });
 
 $('battleLeaveBtn').addEventListener('click', () => {
+  clearStoryBattleEndTimer();
   pauseBattle();
   battle.enemies = [];
   battle.allies = [];

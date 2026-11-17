@@ -202,7 +202,7 @@ function updateBattleUI() {
   (battle.enemies || []).forEach(updateFighterCard);
 
   const leaveBtn = $('battleLeaveBtn');
-  if (leaveBtn) leaveBtn.style.display = battle.over ? '' : 'none';
+  if (leaveBtn) leaveBtn.style.display = (battle.over && !battle.storyBattleId) ? '' : 'none';
   const forfeitBtn = $('battleForfeitBtn');
   if (forfeitBtn) forfeitBtn.style.display = (battle.over || battle.storyBattleId) ? 'none' : '';
   const pauseBtn = $('battlePauseBtn');

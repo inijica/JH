@@ -20,8 +20,12 @@ function getOfflineBonusMs() {
   return Number.isFinite(v) && v > 0 ? v : 0;
 }
 
+function isOfflineBonusPaused() {
+  return !!(typeof player !== 'undefined' && player && player.offlineBonusPaused);
+}
+
 function isOfflineBonusActive() {
-  return !!(typeof player !== 'undefined' && player && player.surname && getOfflineBonusMs() > 0);
+  return !!(typeof player !== 'undefined' && player && player.surname && !isOfflineBonusPaused() && getOfflineBonusMs() > 0);
 }
 
 function getGameSpeedMultiplier() {
@@ -77,7 +81,7 @@ function syncOfflineBonusClock() {
   if (!realDt) return 0;
 
   let bonusUsed = 0;
-  if (typeof player !== 'undefined' && player && player.surname) {
+  if (typeof player !== 'undefined' && player && player.surname && !isOfflineBonusPaused()) {
     const remain = getOfflineBonusMs();
     if (remain > 0) {
       bonusUsed = Math.min(remain, realDt);
@@ -121,21 +125,48 @@ function fmtCountdownClock(ms) {
 
 function updateOfflineBonusUI() {
   const ms = getOfflineBonusMs();
-  const active = !!(typeof player !== 'undefined' && player && player.surname && ms > 0);
+  const paused = isOfflineBonusPaused();
+  const hasBonus = !!(typeof player !== 'undefined' && player && player.surname && ms > 0);
   const badge = $('offlineBonusBadge');
   if (badge) {
-    if (active) {
+    if (hasBonus) {
       badge.style.display = '';
-      badge.textContent = `2× 奖励时间 ${fmtCountdownClock(ms)}`;
+      badge.classList.toggle('paused', paused);
+      badge.textContent = paused
+        ? `已暂停奖励时间 ${fmtCountdownClock(ms)}`
+        : `2× 奖励时间 ${fmtCountdownClock(ms)}`;
     } else {
       badge.style.display = 'none';
+      badge.classList.remove('paused');
       badge.textContent = '';
     }
   }
+  const pauseToggle = $('offlineBonusPauseToggle');
+  if (pauseToggle) pauseToggle.checked = paused;
   const settingVal = $('offlineBonusSettingVal');
   if (settingVal) {
-    settingVal.textContent = ms > 0 ? `${fmtDurationCN(Math.ceil(ms / 1000))}（2× 速度）` : '0 秒';
+    settingVal.textContent = ms > 0
+      ? `${fmtDurationCN(Math.ceil(ms / 1000))}（${paused ? '已暂停 · 1× 速度' : '2× 速度'}）`
+      : '0 秒';
   }
+}
+
+function setOfflineBonusPaused(paused) {
+  if (typeof player === 'undefined' || !player) return false;
+  syncOfflineBonusClock();
+  player.offlineBonusPaused = Boolean(paused);
+  updateOfflineBonusUI();
+  if (typeof saveGame === 'function') {
+    try { saveGame(); } catch (err) {}
+  }
+  if (typeof showToast === 'function') {
+    showToast(player.offlineBonusPaused ? '奖励时间已暂停（恢复 1 倍速）' : '奖励时间已恢复（2 倍速）');
+  }
+  return player.offlineBonusPaused;
+}
+
+function toggleOfflineBonusPause() {
+  return setOfflineBonusPaused(!isOfflineBonusPaused());
 }
 
 /* 离开时正在垂钓：重新登录后继续垂钓（不结算离线收获） */
