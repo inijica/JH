@@ -709,10 +709,14 @@ window.DIALOG_TREE = {
           ? '“放心去吧，赵家村有我护着。”'
           : '李乾元正站在院中清点书卷，见你到来，微微颔首。';
       }
+      if (storyFlags.xuanlanLearned) {
+        return '李乾元正负手立于庭前，见你走来，神色温和地点了点头。';
+      }
       return NPC_DEFS.liQianyuan.greeting;
     },
     options: [
       { label: '切磋', action: 'spar', npc: 'liQianyuan', hide: () => !!storyFlags.xuanlanLearned },
+      { label: '招式讲解', action: 'teachMartial', hide: () => !storyFlags.xuanlanLearned },
       { label: '道别', next: 'farewellLiQianyuan', hide: () => !storyFlags.departUnlocked || !!storyFlags.farewellLiQianyuan },
       { label: '离开', action: 'leave' }
     ]

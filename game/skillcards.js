@@ -50,7 +50,6 @@ const SKILL_CARD_BUILDERS = {
 
   jiusi: (s, lv) => {
     const st = getJiusiStats(lv);
-    const siJin = getTotalComp() / 2;
     const jsMult = getPerLayerMult(getMartialSkillById('jiusi'));
     const perLayerSword = Math.round(3 * jsMult);
     const rows = `
@@ -61,8 +60,8 @@ const SKILL_CARD_BUILDERS = {
       <div class="skill-card-row">伤害倍率：<b>${st.multiplier}</b></div>
       <div class="skill-card-row">当前剑法：<b>${fmtBondStat(getTotalSword())}</b></div>
       <div class="skill-card-row">【思退】：每次使用后叠 1 层，上限 <b>${JIUSI_SITUI_MAX}</b> 层，每层闪避 <b>+${Math.round(JIUSI_SITUI_EVA * 100)}%</b></div>
-      <div class="skill-card-row">【思进】：伤害提升 <b>悟性/2 %</b>（当前 +${fmtBondStat(siJin)}%）</div>
-      ${lv >= 20 ? `<div class="skill-card-row">【思退·反击】：满 ${JIUSI_SITUI_MAX} 层时，闪避后以九思剑法反击</div>` : ''}
+      <div class="skill-card-row">【思进】：【思退】满 <b>${JIUSI_SITUI_MAX}</b> 层后触发，九思剑法伤害 <b>+45%</b>，反击伤害 <b>+100%</b></div>
+      ${lv >= 20 ? `<div class="skill-card-row">【思退·反击】：满 ${JIUSI_SITUI_MAX} 层时，闪避后以九思剑法反击（闪避几段则反击几段）</div>` : ''}
       ${lv >= 100 ? `<div class="skill-card-row">【先手】：进入战斗时立刻使用三次九思剑法</div>` : ''}`;
     return { rows, unlockHtml: renderUnlockList(JIUSI_UNLOCKS, lv) };
   },
@@ -340,7 +339,7 @@ function buildFishingTechniqueCard() {
     <div class="skill-card-name">渔夫（Lv.${lv}）</div>
     <div class="skill-card-row">升级经验：<b>${Math.round(skill.exp || 0)} / ${Math.round(need)}</b></div>
     <div class="skill-exp"><div class="skill-exp-fill" style="width:${Math.min(100, (skill.exp || 0) / need * 100)}%"></div></div>
-    <div class="skill-train-meta">每级提升：钓鱼品质提升，钓鱼时间缩短　每3级定力 +1</div>
+    <div class="skill-train-meta">每级提升：钓鱼品质提升，钓鱼时间缩短　每2级定力 +1</div>
     <div class="skill-card-row">当前品质加成：<b>固定 +${fixed}，倍率 ×${qualityRate.toFixed(2)}</b></div>
     <div class="skill-card-row">经验倍率：<b>×${getFishingExpMultiplier().toFixed(2)}</b></div>
     <div class="skill-card-row">当前定力加成：<b>+${luckBonus}</b>　读条速度：<b>${speed}%</b></div>
@@ -368,7 +367,7 @@ function buildPaodingTechniqueCard() {
     <div class="skill-card-name">庖丁（Lv.${lv}）</div>
     <div class="skill-card-row">升级经验：<b>${Math.round(skill.exp || 0)} / ${Math.round(need)}</b></div>
     <div class="skill-exp"><div class="skill-exp-fill" style="width:${Math.min(100, (skill.exp || 0) / need * 100)}%"></div></div>
-    <div class="skill-train-meta">每级提升：刀法 +1，烹饪品质提升　每3级悟性 +1</div>
+    <div class="skill-train-meta">每级提升：刀法 +1，烹饪品质提升　每2级悟性 +1</div>
     <div class="skill-card-row">当前固定加成：<b>+${getPaodingFixedBonus()}</b>　倍率加成：<b>×${getPaodingQualityMultiplier().toFixed(2)}</b></div>
     <div class="skill-card-row">经验倍率：<b>×${getPaodingExpMultiplier().toFixed(2)}</b></div>
     <div class="skill-card-row">当前双倍产出概率：<b>${formatPercent(getPaodingDoubleChance())}</b></div>

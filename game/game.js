@@ -64,9 +64,11 @@ const player = {
   neiLi: 0,
   fist: 0, blade: 0, sword: 0, changbing: 0, qimen: 0, hidden: 0,
   medicine: 0,
+  poison: 0,
   medicineLessonCount: 0,
   cookCount: 0,
   bonusHpRegen: 0,
+  bonusDR: 0,
   offlineEarnings: true,
   offlineBonusMs: 0,
   offlineBonusPaused: false,
@@ -144,7 +146,7 @@ function getFishingExpNeed(level) {
   return getTechniqueExpNeed(level);
 }
 function getFishingLuckBonus(level = getFishingLevel()) {
-  let bonus = Math.floor(level / 3);
+  let bonus = Math.floor(level / 2);
   if (level >= 10) bonus += 1;
   if (level >= 30) bonus += 5;
   if (level >= 70) bonus += 15;
@@ -251,11 +253,11 @@ function getPaodingBladeBonus() {
 }
 function getTotalBlade() { return player.blade + getPaodingBladeBonus() + getPaodingDaoBladeBonus(); }
 
-/* 庖丁技艺的悟性加成：每 3 级 +1，25/50 级节点 +3/+5。
+/* 庖丁技艺的悟性加成：每 2 级 +1，25/50 级节点 +3/+5。
    庖丁是技艺，不是武功，没有见微知著，因此不乘 getPerLayerMult。 */
 function getPaodingCompBonus() {
   const lv = getPaodingLevel();
-  let bonus = Math.floor(lv / 3);
+  let bonus = Math.floor(lv / 2);
   if (lv >= 25) bonus += 3;
   if (lv >= 50) bonus += 5;
   return bonus;
@@ -857,6 +859,7 @@ $('dialogOptions').addEventListener('click', (e) => {
   if (opt.action === 'spar') { startSpar(opt.npc); return; }
   if (opt.action === 'peiSpar') { startPeiWenxiuStoryBattle(); return; }
   if (opt.action === 'teachMedicine') { startMedicineLesson(); return; }
+  if (opt.action === 'teachMartial') { startLiQianyuanLesson(); return; }
   if (opt.action === 'leave' || !opt.next) { showDialogNode('end'); return; }
   showDialogNode(opt.next);
 });
@@ -880,22 +883,22 @@ if (npcShipEl) npcShipEl.addEventListener('click', () => showDialogNode('npcShip
 const npcDaifuEl = $('npcZhaoDaifu');
 if (npcDaifuEl) npcDaifuEl.addEventListener('click', () => showDialogNode('npcDaifu'));
 
-/* 李乾元：已领悟玄览通微后暂时隐藏；启程解锁后在离开赵家村前可回书院道别 */
+/* 李乾元：已解锁后驻留书院（离开赵家村前常驻，领悟玄览通微后提供招式讲解） */
 function updateLiQianyuanNpc() {
   const el = $('npcLiQianyuan');
   if (!el) return;
-  const visible = !storyFlags.leftVillage && ((storyFlags.liQianyuanUnlocked && !storyFlags.xuanlanLearned) || !!storyFlags.departUnlocked);
+  const visible = !storyFlags.leftVillage && (!!storyFlags.liQianyuanUnlocked || !!storyFlags.xuanlanLearned || !!storyFlags.departUnlocked);
   el.style.display = visible ? '' : 'none';
 }
 const npcLiQianyuanEl = $('npcLiQianyuan');
 if (npcLiQianyuanEl) {
   npcLiQianyuanEl.addEventListener('click', () => {
     if (storyFlags.leftVillage) return;
-    if (storyFlags.departUnlocked) {
+    if (storyFlags.xuanlanLearned || storyFlags.departUnlocked) {
       showDialogNode('npcLiQianyuan');
       return;
     }
-    if (!storyFlags.liQianyuanUnlocked || storyFlags.xuanlanLearned) return;
+    if (!storyFlags.liQianyuanUnlocked) return;
     if (storyFlags.liQianyuanTalked && storyFlags.liQianyuanDefeated) {
       showDialogNode('lqAfterWin');
       return;
@@ -1112,7 +1115,7 @@ if (npcXiaPuyingHomeEl) {
   });
 }
 
-/* 玄览通微：只作为剧情领悟标记，不占武功栏；领悟后李乾元选项永久消失 */
+/* 玄览通微：只作为剧情领悟标记，不占武功栏；领悟后李乾元保留在书院提供招式讲解 */
 function learnXuanlan() {
   if (storyFlags.xuanlanLearned) return;
   storyFlags.xuanlanLearned = true;
@@ -1219,6 +1222,30 @@ function startMedicineLesson() {
   showDialogNode(firstLesson ? 'npcDaifuTeachFirst' : (isTenthLesson ? 'npcDaifuTeachTenth' : 'npcDaifuTeachRepeat'));
 }
 
+function startLiQianyuanLesson() {
+  const npcId = 'liQianyuan';
+  const cdLeft = getTeachCdLeft(npcId);
+  if (cdLeft > 0) {
+    showToast(`刚请教过招式呢，过${Math.ceil(cdLeft / 1000)}s再来吧`, 1000);
+    return;
+  }
+  if (!player.teachCd || typeof player.teachCd !== 'object') player.teachCd = {};
+  player.teachCd[npcId] = Date.now() + TEACH_CD_MS;
+
+  player.fist = (Number(player.fist) || 0) + 2;
+  player.blade = (Number(player.blade) || 0) + 2;
+  player.sword = (Number(player.sword) || 0) + 2;
+  player.changbing = (Number(player.changbing) || 0) + 2;
+  player.qimen = (Number(player.qimen) || 0) + 2;
+  player.hidden = (Number(player.hidden) || 0) + 2;
+
+  addIntel('李乾元为你讲解了各派武功，你的全部武学属性提升了 2 点。', 'good');
+  updateAttrUI();
+  saveGame();
+  showDialogNode('end');
+  showToast('李乾元为你讲解了各派武功，你的全部武学属性提升了2点。');
+}
+
 /* makeSparEnemy / getActiveTrainingSkills 见 battle.js */
 /* ================= 羁绊系统 ================= */
 
@@ -1260,7 +1287,7 @@ const BOND_SKILL_MAX_LEVEL = 100;
 const BOND_CULT_INTERVAL_MS = 60 * 60 * 1000;
 const BOND_STAT_GROW_INTERVAL_MS = 2 * 60 * 60 * 1000;
 const BOND_SPAR_ID = 'xiaPuying';
-/* 羁绊角色每两个时辰自行增长 5% 的根骨/悟性/定力（最小 1） */
+/* 羁绊角色每两小时自行增长 5% 的根骨/悟性/定力（最小 1） */
 const BOND_GROWTH_KEYS = ['root', 'comp', 'luck'];
 const BOND_GROWTH_RATIO = 0.05;
 
@@ -1373,8 +1400,8 @@ function getBondNeiLiBonus() {
   const lv = ensureBondChar().levels.tanafa;
   let bonus = 0;
   if (lv >= 10) bonus += 10;
-  if (lv >= 50) bonus += 500;
-  if (lv >= 100) bonus += 2000;
+  if (lv >= 50) bonus += 200;
+  if (lv >= 100) bonus += 500;
   return bonus;
 }
 
@@ -1833,6 +1860,9 @@ function peiWenxiuStrike(e, opts) {
 
   if (hitCount <= 0) {
     addLog(`${who}侧身避开了${e.name}的【${opts.name}】。`, 'win');
+    if (evadedCount > 0 && typeof tryPlayerJiusiCounter === 'function') {
+      tryPlayerJiusiCounter(e, target, evadedCount);
+    }
     return;
   }
 
@@ -1851,6 +1881,8 @@ function peiWenxiuStrike(e, opts) {
   if (target.hp <= 0) {
     target.hp = 0;
     addLog(`${target.isPlayer ? '你' : target.name} 倒下了！`, 'dmg');
+  } else if (evadedCount > 0 && typeof tryPlayerJiusiCounter === 'function') {
+    tryPlayerJiusiCounter(e, target, evadedCount);
   }
 }
 
@@ -2049,13 +2081,14 @@ function renderBondPanel() {
       unlockLines.push(`20羁绊：你与夏扑萤的暗器互相 +对方暗器/10（你 +${fmtBondInt(bondToPlayer)}，夏扑萤 +${fmtBondInt(playerToBond)}）`);
     }
     if (bond >= 50) unlockLines.push(`50羁绊：你的青鸢飞纵修炼效率 +${fmtBondInt(b.levels.qingyuan * 5)}%，夏扑萤的体魄 +${fmtBondInt(b.levels.qingyuan)}`);
-    if (bond >= 150) unlockLines.push(`150羁绊：同阵营并肩作战时，你和夏扑萤的闪避 +20%；你的行动速度 +${fmtBondInt(getBondSpeed() / 10)}`);
+    if (bond >= 150) unlockLines.push(`150羁绊：同阵营并肩作战时，你和夏扑萤的闪避 +35%；你的行动速度 +${(Number(getBondSpeed()) / 10).toFixed(2)}`);
+    if (bond >= 500) unlockLines.push('500羁绊：夏扑萤每次行动后立刻进行一次飞石破攻击');
     note.textContent =
       `战斗中全属性 +${fmtBondInt(bond * 0.1)}%\n` +
       `与其切磋的经验奖励 +${fmtBondInt(bond * 0.5)}%\n` +
       `内力增速 ${fmtRate(Math.round(rate * 1000) / 1000)}/分钟\n` +
-      `每个时辰自动修炼 ${cultText} 门武功（可重复）\n` +
-      `每两个时辰根骨、悟性、定力 +${Math.round(BOND_GROWTH_RATIO * 100)}%（至少 +1）` +
+      `每小时自动修炼 ${cultText} 门武功（可重复）\n` +
+      `每两小时根骨、悟性、定力 +${Math.round(BOND_GROWTH_RATIO * 100)}%（至少 +1）` +
       (unlockLines.length ? `\n${unlockLines.join('\n')}` : '');
   }
 
@@ -2139,13 +2172,14 @@ function bondTeach(targetId) {
     openBondTeachPicker();
     return;
   }
-  if (!BOND_SKILL_ORDER.includes(targetId)) return;
+  const known = getBondKnownSkillIds();
+  if (!known.includes(targetId)) return;
 
   if (!player.teachCd || typeof player.teachCd !== 'object') player.teachCd = {};
   player.teachCd[BOND_TEACH_ID] = Date.now() + BOND_TEACH_CD_MS;
 
   if (!player.skills.some(s => s && s.id === targetId)) {
-    const teach = BOND_SKILL_TEACH[targetId] || { name: BOND_SKILL_NAMES[targetId], type: '招式', select: '招式' };
+    const teach = BOND_SKILL_TEACH[targetId] || { name: getBondSkillName(targetId), type: '招式', select: '招式' };
     player.skills.push({ id: targetId, name: teach.name, type: teach.type, level: 1, exp: 0 });
     if (!player.trainingSelections || typeof player.trainingSelections !== 'object') player.trainingSelections = {};
     if (!player.trainingSelections[teach.select]) player.trainingSelections[teach.select] = targetId;
@@ -2153,7 +2187,7 @@ function bondTeach(targetId) {
     showToast(`学会了${teach.type}【${teach.name}】`);
   } else {
     const skill = player.skills.find(s => s && s.id === targetId);
-    const exp = Math.round(getFiveMinuteTrainingExp(skill) * (1 + getBondValue() / 100));
+    const exp = Math.round(getFiveMinuteTrainingExp(skill));
     if (skill && exp > 0) {
       addSkillExp(skill, exp);
       addIntel(`你向夏扑萤请教，【${skill.name}】获得 ${exp} 点经验。`, 'good');
@@ -2169,7 +2203,7 @@ function bondTeach(targetId) {
 
 function openBondTeachPicker() {
   if (!Array.isArray(player.skills)) player.skills = [];
-  const ids = BOND_SKILL_ORDER.slice();
+  const ids = getBondKnownSkillIds();
   openBondModal({
     title: '向 夏 扑 萤 请 教',
     desc: '选择一门武功请教：未习得可直接学会，已习得可获得五分钟修炼经验。每次请教后有 1200 秒冷却。',
@@ -2390,7 +2424,7 @@ function bondGuide() {
   }
   openBondModal({
     title: '指 点 武 功',
-    desc: '重数提升 = 你的重数 ÷ 20（最低为 1），指点后不超过你重数的 80%。每次指点后有 1200 秒冷却。',
+    desc: '重数提升 = 你的重数 ÷ 20（最低为 1），指点后不超过你重数的 80%，并额外获得 5 点羁绊。每次指点后有 1200 秒冷却。',
     bodyHtml: '<div class="bond-modal-list" id="bondGuideList"></div>',
     onMount: () => {
       const list = $('bondGuideList');
@@ -2412,10 +2446,12 @@ function bondGuide() {
               return;
             }
             b.levels[o.id] = current + actual;
+            player.bondXiaPuying = (Number(player.bondXiaPuying) || 0) + 5;
             if (!player.teachCd || typeof player.teachCd !== 'object') player.teachCd = {};
             player.teachCd[BOND_GUIDE_ID] = Date.now() + BOND_GUIDE_CD_MS;
-            addIntel(`你指点了夏扑萤的【${getBondSkillName(o.id)}】，使其提升了 ${actual} 重（现${levelToChinese(b.levels[o.id])}重）。`, 'good');
-            showToast(`指点成功，${getBondSkillName(o.id)} +${actual} 重`);
+            addIntel(`你指点了夏扑萤的【${getBondSkillName(o.id)}】，使其提升了 ${actual} 重（现${levelToChinese(b.levels[o.id])}重），夏扑萤羁绊 +5（当前 ${fmtBondStat(getBondValue())}）。`, 'good');
+            showToast(`指点成功，${getBondSkillName(o.id)} +${actual} 重，羁绊 +5`);
+            updateAttrUI();
             renderBondPanel();
             saveGame();
           }
@@ -2598,6 +2634,8 @@ function updateAttrUI() {
   if (hiddenEl) hiddenEl.textContent = Math.round(getTotalHidden());
   const medicineEl = $('a-medicine');
   if (medicineEl) medicineEl.textContent = Math.round(getTotalMedicine());
+  const poisonEl = $('a-poison');
+  if (poisonEl) poisonEl.textContent = Math.round(getTotalPoison());
 
   updateSidePanel();
 }
@@ -2732,11 +2770,13 @@ function loadGame() {
     if (typeof player.changbing !== 'number' || !Number.isFinite(player.changbing)) player.changbing = 0;
     if (typeof player.qimen !== 'number' || !Number.isFinite(player.qimen)) player.qimen = 0;
     if (typeof player.medicine !== 'number' || !Number.isFinite(player.medicine)) player.medicine = 0;
+    if (typeof player.poison !== 'number' || !Number.isFinite(player.poison)) player.poison = 0;
     let medicineLessons = Number(player.medicineLessonCount);
     if (!Number.isFinite(medicineLessons) || medicineLessons < 0) medicineLessons = 0;
     player.medicineLessonCount = Math.floor(medicineLessons);
     if (typeof player.speed !== 'number') player.speed = 0.15;
     if (!Number.isFinite(Number(player.bonusHpRegen)) || Number(player.bonusHpRegen) < 0) player.bonusHpRegen = 0;
+    if (!Number.isFinite(Number(player.bonusDR)) || Number(player.bonusDR) < 0) player.bonusDR = 0;
     if (typeof player.offlineEarnings !== 'boolean') player.offlineEarnings = true;
     const savedBonusMs = Number(player.offlineBonusMs);
     player.offlineBonusMs = Number.isFinite(savedBonusMs) && savedBonusMs > 0 ? savedBonusMs : 0;
@@ -2937,10 +2977,12 @@ function resetGame() {
     player.qimen = 0;
     player.hidden = 0;
     player.medicine = 0;
+    player.poison = 0;
     player.medicineLessonCount = 0;
     player.constitution = 3;
     player.speed = 0.15;
     player.bonusHpRegen = 0;
+    player.bonusDR = 0;
     player.offlineEarnings = true;
     player.offlineBonusMs = 0;
     player.offlineBonusPaused = false;
@@ -3478,10 +3520,12 @@ $('startBtn').addEventListener('click', () => {
   player.qimen = 0;
   player.hidden = 0;
   player.medicine = 0;
+  player.poison = 0;
   player.medicineLessonCount = 0;
   player.cookCount = 0;
   player.neiLi = 0;
   player.bonusHpRegen = 0;
+  player.bonusDR = 0;
   player.offlineEarnings = true;
   player.offlineBonusMs = 0;
   player.offlineBonusPaused = false;

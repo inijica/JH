@@ -57,9 +57,10 @@ function fighterDetailHtml(f) {
   ].join('');
 }
 
-/* 武学属性行：数值节点带 data-fm；医术为 0 时整行隐藏 */
+/* 武学属性行：数值节点带 data-fm；医术为 0 时隐藏，毒术玩家始终显示、其余角色 > 0 时显示 */
 function fighterMartialHtml(f) {
   const med = Number(f.medicine) || 0;
+  const poi = Number(f.poison) || 0;
   return [
     `<span>拳掌 <b data-fm="fist">${fmtBattleInt(f.fist)}</b></span>`,
     `<span>刀法 <b data-fm="blade">${fmtBattleInt(f.blade)}</b></span>`,
@@ -67,7 +68,8 @@ function fighterMartialHtml(f) {
     `<span>长兵 <b data-fm="changbing">${fmtBattleInt(f.changbing)}</b></span>`,
     `<span>奇门 <b data-fm="qimen">${fmtBattleInt(f.qimen)}</b></span>`,
     `<span>暗器 <b data-fm="hidden">${fmtBattleInt(f.hidden)}</b></span>`,
-    `<span data-fm="medicine-row" style="${med > 0 ? '' : 'display:none'}">医术 <b data-fm="medicine">${fmtBattleInt(f.medicine)}</b></span>`
+    `<span data-fm="medicine-row" style="${med > 0 ? '' : 'display:none'}">医术 <b data-fm="medicine">${fmtBattleInt(f.medicine)}</b></span>`,
+    `<span data-fm="poison-row" style="${(f.isPlayer || poi > 0) ? '' : 'display:none'}">毒术 <b data-fm="poison">${fmtBattleInt(f.poison)}</b></span>`
   ].join('');
 }
 
@@ -102,7 +104,8 @@ function fighterStateNotes(f) {
     notes.push(`撼山势 ${f.hanShiLayers} 层`);
   }
   if (f.siTuiLayers !== undefined && Number(f.siTuiLayers) > 0) {
-    notes.push(`思退 ${f.siTuiLayers} 层`);
+    const maxSiTui = typeof JIUSI_SITUI_MAX === 'number' ? JIUSI_SITUI_MAX : 9;
+    notes.push(`思退 ${f.siTuiLayers} 层${Number(f.siTuiLayers) >= maxSiTui ? '（思进）' : ''}`);
   }
   if (f.yourenLayers !== undefined && Number(f.yourenLayers) > 0) {
     notes.push(`游刃 ${f.yourenLayers} 层`);
@@ -165,6 +168,9 @@ function updateFighterCard(f) {
   setFm('medicine', fmtBattleInt(f.medicine));
   const medRow = el.querySelector('[data-fm="medicine-row"]');
   if (medRow) medRow.style.display = (Number(f.medicine) || 0) > 0 ? '' : 'none';
+  setFm('poison', fmtBattleInt(f.poison));
+  const poiRow = el.querySelector('[data-fm="poison-row"]');
+  if (poiRow) poiRow.style.display = (f.isPlayer || (Number(f.poison) || 0) > 0) ? '' : 'none';
 
   const hp = Math.max(0, Number(f.hp) || 0);
   const maxHp = Math.max(1, Number(f.maxHp) || 1);

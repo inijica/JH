@@ -2,8 +2,8 @@
 const TANAFA_UNLOCKS = [
   { level: 10,  desc: '内力 +10' },
   { level: 20,  desc: '淬火呼吸法提供的内力提升速度 ×2' },
-  { level: 50,  desc: '内力 +500' },
-  { level: 100, desc: '内力 +2000' }
+  { level: 50,  desc: '内力 +200' },
+  { level: 100, desc: '内力 +500' }
 ];
 
 function getTanafaLevel() {
@@ -63,6 +63,9 @@ function getHuomaiRootBonus(level = getHuomaiLevel()) {
 function getTotalMedicine() {
   return (Number(player.medicine) || 0) + getHuomaiMedicineBonus();
 }
+function getTotalPoison() {
+  return Number(player.poison) || 0;
+}
 function getHuomaiRatePerMin(level = getHuomaiLevel()) {
   if (level <= 0) return 0;
   const mult = getPerLayerMult(getMartialSkillById('huomai'));
@@ -93,8 +96,8 @@ function getNeiLiBonus() {
   const level = getTanafaLevel();
   let bonus = 0;
   if (level >= 10) bonus += 10;
-  if (level >= 50) bonus += 500;
-  if (level >= 100) bonus += 2000;
+  if (level >= 50) bonus += 200;
+  if (level >= 100) bonus += 500;
   return bonus * getPerLayerMult(getMartialSkillById('tanafa'));
 }
 function getTotalNeiLi() { return player.neiLi + getNeiLiBonus() + getJiusiNeiLiBonus(); }

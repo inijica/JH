@@ -186,9 +186,9 @@ function makeGiantWhiteRobeEnemy() {
     hp: maxHp,
     maxHp,
     atk: 0,
-    speed: Math.max(0.05, bSpeed * M - 0.1),
+    speed: 0.6,
     con,
-    neiLi: bNeiLi * M,
+    neiLi: 200,
     root: bRoot * M,
     comp: bComp * M,
     luck: bLuck * M,
@@ -266,7 +266,7 @@ const DREAM_CHALLENGES = [
       { label: '悟性 +3', apply() { player.comp = (Number(player.comp) || 0) + 3; } },
       { label: '根骨 +3', apply() { player.root = (Number(player.root) || 0) + 3; } },
       { label: '定力 +5', apply() { player.luck = (Number(player.luck) || 0) + 5; } },
-      { label: '内力 +100', apply() { player.neiLi = (Number(player.neiLi) || 0) + 100; } },
+      { label: '内力 +50', apply() { player.neiLi = (Number(player.neiLi) || 0) + 50; } },
       { label: '体魄 +30', apply() { player.constitution = (Number(player.constitution) || 0) + 30; } },
       { label: '医术 +30', apply() { player.medicine = (Number(player.medicine) || 0) + 30; } }
     ],
@@ -282,13 +282,32 @@ const DREAM_CHALLENGES = [
     lead: '白衣怪人莫名其妙地合体变成了一个超大型的白衣怪人.......',
     enemies: ['超大型白衣怪人'],
     mechanics: [
-      '超大型白衣怪人属性为白衣怪人 ×5，命中率 ×1.5，闪避率 ×1.5，行动速度 -0.1；招式与白衣怪人相同。',
-      '每秒给在场所有人（包括自己）叠加一层【诡异毒素】：每层每秒失去 1 点气血；作用在超大型白衣怪人身上时转变为每秒回复等量气血。'
+      '超大型白衣怪人其余属性为白衣怪人 ×5，命中率 ×1.5，闪避率 ×1.5，行动速度 0.6，内力 200；招式与白衣怪人相同。',
+      '每秒给在场所有人（包括自己）叠加一层【诡异毒素】：每层每秒失去 5 点气血；作用在超大型白衣怪人身上时转变为每秒回复等量气血。'
     ],
     notes: [
       '陪伴角色会与你一同入梦参战。'
     ],
-    rewards: [],
+    rewards: [
+      { label: '根骨 +7', apply() { player.root = (Number(player.root) || 0) + 7; } },
+      { label: '悟性 +3', apply() { player.comp = (Number(player.comp) || 0) + 3; } },
+      { label: '定力 +3', apply() { player.luck = (Number(player.luck) || 0) + 3; } },
+      { label: '每秒生命恢复 +100', apply() { player.bonusHpRegen = (Number(player.bonusHpRegen) || 0) + 100; } },
+      { label: '伤害减免 +200', apply() { player.bonusDR = (Number(player.bonusDR) || 0) + 200; } },
+      {
+        label: '全部武学属性 +30',
+        apply() {
+          player.fist = (Number(player.fist) || 0) + 30;
+          player.blade = (Number(player.blade) || 0) + 30;
+          player.sword = (Number(player.sword) || 0) + 30;
+          player.changbing = (Number(player.changbing) || 0) + 30;
+          player.qimen = (Number(player.qimen) || 0) + 30;
+          player.hidden = (Number(player.hidden) || 0) + 30;
+        }
+      },
+      { label: '医术 +30', apply() { player.medicine = (Number(player.medicine) || 0) + 30; } },
+      { label: '毒术 +50', apply() { player.poison = (Number(player.poison) || 0) + 50; } }
+    ],
     buildEnemies() {
       return [makeGiantWhiteRobeEnemy()];
     }

@@ -9,13 +9,13 @@ const JIUMAI_DECAY_MS = 3000;
 const HANSHAN_MAX_LAYERS = 100;
 /* 【打穴】：飞石破命中后给敌人叠一层，无上限，每层降低 0.5 内力；随时间消退 */
 const DAXUE_NEILI_DOWN = 0.5;
-/* 【思退】：九思剑法每次使用后叠一层，上限 9 层，每层闪避 +3% */
+/* 【思退】：九思剑法每次使用后叠一层，上限 9 层，每层闪避 +5% */
 const JIUSI_SITUI_MAX = 9;
-const JIUSI_SITUI_EVA = 0.03;
+const JIUSI_SITUI_EVA = 0.05;
 /* 【流血】：每层每秒流失的气血 */
 const BLEED_DAMAGE_PER_STACK_PER_SEC = 2;
 /* 【诡异毒素】：每层每秒流失的气血（对超大型白衣怪人转为等量回血） */
-const WEIRD_POISON_PER_STACK_PER_SEC = 1;
+const WEIRD_POISON_PER_STACK_PER_SEC = 5;
 
 /* 战斗状态（唯一实例） */
 const battle = {
@@ -163,6 +163,7 @@ function buildPlayerFighter() {
     comp: getTotalComp(),
     luck: getTotalLuck(),
     medicine: getTotalMedicine(),
+    poison: getTotalPoison(),
     skills: sortBattleSkillList(player.skills),
     memory: {},
     confused: false,
@@ -222,6 +223,8 @@ function buildBondCompanionFighter() {
     root: getBondRoot() * boost,
     comp: getBondComp() * boost,
     luck: getBondLuck() * boost,
+    medicine: 0,
+    poison: 0,
     attack: { name: '飞石破', multiplier: fei.multiplier, hits: fei.hits, stat: 'hidden' },
     skills: getBondKnownSkillIds().map(id => `${getBondSkillName(id)}（${levelToChinese(b.levels[id])}重）`),
     memory: {},
@@ -240,16 +243,16 @@ function buildCompanionFighters(excludeIds, withCompanion) {
   return out;
 }
 
-/* 150 羁绊解锁：与夏扑萤同阵营并肩作战时，双方闪避 +20%，玩家行动速度 += 夏扑萤行动速度/10 */
+/* 150 羁绊解锁：与夏扑萤同阵营并肩作战时，双方闪避 +35%，玩家行动速度 += 夏扑萤行动速度/10 */
 function applyBondSameCampBonus(allies) {
   if (getBondValue() < 150) return;
   const playerFighter = allies.find(f => f && f.isPlayer && f.hp > 0);
   const companionFighter = allies.find(f => f && f.isCompanion && f.hp > 0);
   if (!playerFighter || !companionFighter) return;
   if (!Array.isArray(battle.enemies) || !battle.enemies.some(f => f && f.hp > 0)) return;
-  playerFighter.bondEvasionBonus = 0.2;
-  playerFighter.evasion = (Number(playerFighter.evasion) || 0) + 0.2;
-  companionFighter.evasion = (Number(companionFighter.evasion) || 0) + 0.2;
+  playerFighter.bondEvasionBonus = 0.35;
+  playerFighter.evasion = (Number(playerFighter.evasion) || 0) + 0.35;
+  companionFighter.evasion = (Number(companionFighter.evasion) || 0) + 0.35;
   playerFighter.speed = (Number(playerFighter.speed) || 0) + (Number(companionFighter.speed) || 0) / 10;
 }
 
@@ -618,7 +621,7 @@ function performFeishipoStrike(stats, effectMultiplier, scale, target) {
   });
 }
 
-function performJiusiStrike(stats, effectMultiplier, scale, target) {
+function performJiusiStrike(stats, effectMultiplier, scale, target, opts) {
   const pf = playerFighter();
   const res = performStrike({
     name: '九思剑法',
@@ -627,11 +630,32 @@ function performJiusiStrike(stats, effectMultiplier, scale, target) {
     scale,
     target,
     vulnerable: false,
-    calcDamage: (mult, eff, e) => calcSwordDamage(mult, eff, e)
+    calcDamage: (mult, eff, e) => calcSwordDamage(mult, eff, e, opts)
   });
   /* 【思退】：每次使用后叠一层，上限 9 */
   if (pf) pf.siTuiLayers = Math.min(JIUSI_SITUI_MAX, (Number(pf.siTuiLayers) || 0) + 1);
   return res;
+}
+
+function tryPlayerJiusiCounter(attacker, target, evadedHits) {
+  const hits = Math.max(0, Math.floor(Number(evadedHits) || 0));
+  if (hits <= 0) return;
+  if (!target || !target.isPlayer || target.hp <= 0) return;
+  if (getJiusiLevel() < 20) return;
+  if ((Number(target.siTuiLayers) || 0) < JIUSI_SITUI_MAX) return;
+  if (battle.over) return;
+
+  const level = getJiusiLevel();
+  const baseStats = getJiusiStats(level);
+  const counterStats = { hits, multiplier: baseStats.multiplier };
+  const counterTarget = (attacker && attacker.hp > 0)
+    ? attacker
+    : pickWeightedTarget((battle.enemies || []).filter(f => f && f.hp > 0));
+  if (!counterTarget) return;
+
+  addLog(`【思退·反击】你借闪身之势回剑反刺（反击 ${hits} 段）！`, 'crit');
+  performJiusiStrike(counterStats, 1, 1, counterTarget, { isCounter: true });
+  if (!battle.over) checkBattleEnd();
 }
 
 function performPaodingDaoStrike(stats, effectMultiplier, scale, target) {
@@ -808,6 +832,7 @@ function doJiemai(e) {
   const who = target.isPlayer ? '你' : target.name;
   if (!landed) {
     addLog(`${e.name} 施展【${a.name || '截脉指'}】，指锋尽数落空，${who}未被封住经脉。`, '');
+    if (missed > 0) tryPlayerJiusiCounter(e, target, missed);
     return;
   }
   const dmg = Math.max(0, Math.round((perHit * landed - fighterDR(target)) * 10) / 10);
@@ -819,6 +844,7 @@ function doJiemai(e) {
   addLog(`【截脉指】${e.name} 指力点中${who}经脉，造成 ${fmtNum(dmg)} 点伤害（${notes.join('，')}），【截脉】积至 ${target.jiumai} 层`, 'dmg');
   shakeCard(target);
   if (target.hp <= 0) addLog(`${target.name} 倒下了！`, 'dmg');
+  else if (missed > 0) tryPlayerJiusiCounter(e, target, missed);
 }
 
 function doJinzhen(e, injured) {
@@ -870,9 +896,83 @@ function doEnemyAttack(e) {
   const target = pickWeightedTarget((battle.allies || []).filter(f => f && f.hp > 0));
   if (!target) return;
 
+  const who = target.isPlayer ? '你' : target.name;
+  if (e.attack) {
+    const a = e.attack;
+    const own = fighterAttackValue(e, a.stat);
+    const against = fighterDefenseValue(target, a.stat);
+    const hits = Math.max(1, Number(a.hits) || 1);
+    const perHit = Math.max(0, (20 + own + (own - against / 2) * 2.5) * (Number(a.multiplier) || 0) * 2);
+
+    let landed = 0;
+    let missed = 0;
+    let lastDodgeKind = '';
+    let hitRawTotal = 0;
+    let maxOverflow = 0;
+    let anyEnemyXushi = false;
+    let lastAcc = Number(e.accuracy) || 0.9;
+    let lastEva = fighterEvasion(target);
+
+    for (let i = 0; i < hits; i++) {
+      const dodge = resolveAllyDodge(e, target);
+      if (dodge.dodged) {
+        missed++;
+        if (dodge.dodgeKind) lastDodgeKind = dodge.dodgeKind;
+        continue;
+      }
+      landed++;
+      if (dodge.enemyXushi) anyEnemyXushi = true;
+      if (dodge.overflow > maxOverflow) maxOverflow = dodge.overflow;
+      lastAcc = dodge.acc;
+      lastEva = dodge.eva;
+      hitRawTotal += perHit * (dodge.overflow > 0 ? (1 + dodge.overflow) : 1);
+    }
+
+    if (landed <= 0) {
+      addLog(
+        lastDodgeKind === 'qingyuan'
+          ? `【青鸢飞纵】${who}借势再折，第二次判定中避过${e.name}的攻击！`
+          : (lastDodgeKind === 'shenning'
+            ? `【神宁气静】${who}心如止水，看破来势，再避${e.name}的攻击！`
+            : `${who}侧身避开了${e.name}的攻击。`),
+        lastDodgeKind ? 'win' : ''
+      );
+      if (missed > 0) tryPlayerJiusiCounter(e, target, missed);
+      return;
+    }
+
+    const avgMult = (perHit > 0 && landed > 0) ? (hitRawTotal / (perHit * landed)) : 1;
+    let dmg = Math.max(0, perHit * landed - fighterDR(target)) * avgMult;
+    if (Number(target.damageTakenMult) > 0) dmg *= Number(target.damageTakenMult);
+    dmg = Math.round(dmg * 10) / 10;
+
+    target.hp -= dmg;
+    const notes = [];
+    if (hits > 1) notes.push(`${landed}段命中`);
+    if (missed > 0) notes.push(`${missed}段被闪避`);
+    if (anyEnemyXushi) notes.push(`虚实莫测·命中 ${formatPercent(calcHitChance(lastAcc, lastEva))}`);
+    if (maxOverflow > 0) notes.push(`溢出命中增伤 +${Math.round(maxOverflow * 100)}%`);
+    addLog(`${e.name} 施展【${a.name}】，对${who}造成 ${fmtNum(dmg)} 点伤害${notes.length ? `（${notes.join('，')}）` : ''}`, 'dmg');
+    shakeCard(target);
+
+    if (a.bleed && target.hp > 0) {
+      const bleedHits = Math.max(1, landed);
+      target.bleedStacks = Math.floor((Number(target.bleedStacks) || 0) + bleedHits);
+      if (!target.bleedNextAt) target.bleedNextAt = (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now()) + 1000;
+      addLog(`【流血】${who}被${a.name}咬中，流血叠加至 ${target.bleedStacks} 层。`, 'dmg');
+    }
+
+    if (target.hp <= 0) {
+      target.hp = 0;
+      addLog(`${target.name} 倒下了！`, 'dmg');
+    } else if (missed > 0) {
+      tryPlayerJiusiCounter(e, target, missed);
+    }
+    return;
+  }
+
   const dodge = resolveAllyDodge(e, target);
   if (dodge.dodged) {
-    const who = target.isPlayer ? '你' : target.name;
     addLog(
       dodge.dodgeKind === 'qingyuan'
         ? `【青鸢飞纵】${who}借势再折，第二次判定中避过${e.name}的攻击！`
@@ -881,49 +981,22 @@ function doEnemyAttack(e) {
           : `${who}侧身避开了${e.name}的攻击。`),
       dodge.dodgeKind ? 'win' : ''
     );
-    /* 九思剑法 20 重：【思退】满九层时，闪避后用九思剑法反击 */
-    if (target.isPlayer && getJiusiLevel() >= 20 &&
-        (Number(target.siTuiLayers) || 0) >= JIUSI_SITUI_MAX && !battle.over) {
-      addLog('【思退·反击】你借闪身之势回剑反刺！', 'crit');
-      doJiusiAttack();
-      if (!battle.over) checkBattleEnd();
-    }
+    tryPlayerJiusiCounter(e, target, 1);
     return;
   }
 
-  let rawDmg;
-  let segNote = '';
-  if (e.attack) {
-    const a = e.attack;
-    const own = fighterAttackValue(e, a.stat);
-    const against = fighterDefenseValue(target, a.stat);
-    const hits = Math.max(1, Number(a.hits) || 1);
-    const perHit = Math.max(0, (20 + own + (own - against / 2) * 2.5) * (Number(a.multiplier) || 0) * 2);
-    rawDmg = perHit * hits;
-    if (hits > 1) segNote = `${hits}段命中`;
-  } else {
-    rawDmg = (Number(e.atk) || 0) + Math.round(Math.random() * 4) - 2;
-  }
+  const rawDmg = (Number(e.atk) || 0) + Math.round(Math.random() * 4) - 2;
   let dmg = Math.max(0, rawDmg - fighterDR(target));
   if (dodge.overflow > 0) dmg *= (1 + dodge.overflow);
   if (Number(target.damageTakenMult) > 0) dmg *= Number(target.damageTakenMult);
   dmg = Math.round(dmg * 10) / 10;
 
   target.hp -= dmg;
-  const who = target.isPlayer ? '你' : target.name;
   const notes = [];
-  if (segNote) notes.push(segNote);
   if (dodge.enemyXushi) notes.push(`虚实莫测·命中 ${formatPercent(calcHitChance(dodge.acc, dodge.eva))}`);
   if (dodge.overflow > 0) notes.push(`溢出命中增伤 +${Math.round(dodge.overflow * 100)}%`);
-  addLog(`${e.name} 施展【${e.attack ? e.attack.name : '攻势'}】，对${who}造成 ${fmtNum(dmg)} 点伤害${notes.length ? `（${notes.join('，')}）` : ''}`, 'dmg');
+  addLog(`${e.name} 施展【攻势】，对${who}造成 ${fmtNum(dmg)} 点伤害${notes.length ? `（${notes.join('，')}）` : ''}`, 'dmg');
   shakeCard(target);
-
-  if (e.attack && e.attack.bleed && target.hp > 0) {
-    const bleedHits = Math.max(1, Number(e.attack.hits) || 1);
-    target.bleedStacks = Math.floor((Number(target.bleedStacks) || 0) + bleedHits);
-    if (!target.bleedNextAt) target.bleedNextAt = (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now()) + 1000;
-    addLog(`【流血】${who}被${e.attack.name}咬中，流血叠加至 ${target.bleedStacks} 层。`, 'dmg');
-  }
 
   if (target.hp <= 0) {
     target.hp = 0;
@@ -997,10 +1070,10 @@ function getBondCompanionSkillSpec(skillId, f) {
   };
 }
 
-function doCompanionAction(f) {
+function doCompanionAction(f, followUpSkillId = '') {
   if (!f || f.hp <= 0) return;
 
-  if (f.confused) {
+  if (!followUpSkillId && f.confused) {
     f.confused = false;
     const dmg = Math.max(0, Math.round(calcNormalDamage(1) * 10) / 10);
     f.hp -= dmg;
@@ -1010,8 +1083,8 @@ function doCompanionAction(f) {
     return;
   }
 
-  let chosenSkillId = '';
-  if (f.id === BOND_SPAR_ID && player.bondStrategy && player.bondStrategy.enabled) {
+  let chosenSkillId = followUpSkillId || '';
+  if (!chosenSkillId && f.id === BOND_SPAR_ID && player.bondStrategy && player.bondStrategy.enabled) {
     chosenSkillId = tryBondLowHpStrategy(f)
       || (typeof tryBondAllyLowHpStrategy === 'function' ? tryBondAllyLowHpStrategy(f) : '')
       || resolveBondStrategySkill();
@@ -1044,7 +1117,7 @@ function doCompanionAction(f) {
     const def = spec.ignoreDef ? 0 : fighterDefenseValue(cur, spec.stat);
     const hanShiBonus = spec.hanShi ? hanShiLayers * hanShiPerLayer * (Number(f.con) || 0) : 0;
     let raw = (20 + (Number(f.con) || 0) + (own - def / 2) * 2.5 + hanShiBonus) * mult * 2;
-    if (spec.siJin) raw *= (1 + (Number(f.comp) || 0) * 0.005);
+    if (spec.siJin && (Number(f.siTuiLayers) || 0) >= JIUSI_SITUI_MAX) raw *= 1.45;
 
     const dmg = Math.max(0, Math.round(
       raw * COMPANION_DAMAGE_SCALE *
@@ -1080,22 +1153,29 @@ function doCompanionAction(f) {
         missSegments
       });
     }
-    return;
-  }
-  const targetText = touched.size > 0 ? [...touched.keys()].join('、') : (firstTarget.name || '');
-  const detail = [`${hitSegments}段命中`];
-  if (missSegments) detail.push(`${missSegments}段被闪避`);
-  if (absorbedTotal > 0) detail.push(`浩然气化去 ${fmtNum(absorbedTotal)} 点`);
-  if (kills.length) detail.push(`击倒 ${[...new Set(kills)].join('、')}`);
-  if (touched.size > 1) {
-    detail.push([...touched.entries()].map(([n, t]) => `${n} ${fmtNum(Math.round(t.applied * 10) / 10)} 点`).join('，'));
-  }
-  addLog(`${f.name} 施展【${spec.name}】，对${targetText}造成 ${fmtNum(Math.round(dmgTotal * 10) / 10)} 点伤害（${detail.join('，')}）`, 'dmg');
-  shakeCard(cur || firstTarget);
+  } else {
+    const targetText = touched.size > 0 ? [...touched.keys()].join('、') : (firstTarget.name || '');
+    const detail = [`${hitSegments}段命中`];
+    if (missSegments) detail.push(`${missSegments}段被闪避`);
+    if (absorbedTotal > 0) detail.push(`浩然气化去 ${fmtNum(absorbedTotal)} 点`);
+    if (kills.length) detail.push(`击倒 ${[...new Set(kills)].join('、')}`);
+    if (touched.size > 1) {
+      detail.push([...touched.entries()].map(([n, t]) => `${n} ${fmtNum(Math.round(t.applied * 10) / 10)} 点`).join('，'));
+    }
+    addLog(`${f.name} 施展【${spec.name}】，对${targetText}造成 ${fmtNum(Math.round(dmgTotal * 10) / 10)} 点伤害（${detail.join('，')}）`, 'dmg');
+    shakeCard(cur || firstTarget);
 
-  /* 同伴攻击同样会触发【无咎】反击：反击由出手的同伴本人承受（书童亦不例外） */
-  const counterTarget = cur || firstTarget;
-  if (counterTarget && counterTarget.hp > 0 && !battle.over) doWujiuCounter(counterTarget, hits, f);
+    /* 同伴攻击同样会触发【无咎】反击：反击由出手的同伴本人承受（书童亦不例外） */
+    const counterTarget = cur || firstTarget;
+    if (counterTarget && counterTarget.hp > 0 && !battle.over) doWujiuCounter(counterTarget, hits, f);
+  }
+
+  /* 500 羁绊效果：夏扑萤每次行动后立刻进行一次飞石破攻击 */
+  if (!followUpSkillId && !battle.over && f.hp > 0 && f.id === BOND_SPAR_ID &&
+      getBondValue() >= 500 && (battle.enemies || []).some(x => x && x.hp > 0)) {
+    addLog(`【心有灵犀】${f.name}顺势再发一记【飞石破】！`, 'crit');
+    doCompanionAction(f, 'feishipo');
+  }
 }
 
 function doFighterAction(f) {
@@ -1340,7 +1420,7 @@ function battleStep(dt) {
   }
 
   /* 【诡异毒素】：超大型白衣怪人在场时，每秒给在场所有存活角色（含自己）叠加一层；
-     每层每秒流失 1 点气血，对超大型白衣怪人则转变为每秒回复 1 点气血 */
+     每层每秒流失 5 点气血，对超大型白衣怪人则转变为每秒回复 5 点气血 */
   {
     const hasGiant = (battle.enemies || []).some(e => e && e.hp > 0 && e.isGiantWhiteRobe);
     const anyPoisoned = allFighters().some(f => f && f.hp > 0 && Number(f.weirdPoisonStacks) > 0);

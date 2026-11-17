@@ -106,7 +106,7 @@ function getTotalQimen() { return Number(player.qimen) || 0; }
 const JIUSI_UNLOCKS = [
   { level: 5,   desc: '悟性+1，剑法+10' },
   { level: 10,  desc: '剑法+20，内力+5，伤害倍率提升至 0.07 倍' },
-  { level: 20,  desc: '悟性+2，神宁气静+3，伤害倍率提升至 0.1 倍；【思退】满九层时，闪避后用九思剑法反击' },
+  { level: 20,  desc: '悟性+2，神宁气静+3，伤害倍率提升至 0.1 倍；【思退】满九层时，闪避后用九思剑法反击（闪避几段反击几段）' },
   { level: 50,  desc: '悟性+5，剑法+50，内力+100，伤害倍率提升至 0.13 倍，伤害次数提升至 6 次' },
   { level: 100, desc: '悟性+20，神宁气静+10，剑法+1000，内力+2500；进入战斗时立刻使用三次九思剑法' }
 ];
@@ -165,11 +165,15 @@ function getTotalSword() {
   return (Number(player.sword) || 0) + getJiusiSwordBonus();
 }
 
-/* 九思剑法伤害：剑法属性，【思进】按 悟性/2 % 提升 */
-function calcSwordDamage(multiplier, effectMultiplier, enemy) {
+/* 九思剑法伤害：剑法属性，【思进】在【思退】满 9 层后触发，九思剑法伤害 +45%，反击伤害 +100% */
+function calcSwordDamage(multiplier, effectMultiplier, enemy, opts) {
   const defMartial = getEnemyMaxMartial(enemy);
   const martialPart = (getTotalSword() - defMartial / 2) * 2.5;
-  const siJin = 1 + getTotalComp() * 0.005;
+  const pf = typeof playerFighter === 'function' ? playerFighter() : null;
+  const maxLayers = typeof JIUSI_SITUI_MAX === 'number' ? JIUSI_SITUI_MAX : 9;
+  const siTuiFull = (Number(pf && pf.siTuiLayers) || 0) >= maxLayers;
+  const isCounter = !!(opts && opts.isCounter);
+  const siJin = siTuiFull ? (isCounter ? 2 : 1.45) : 1;
   return (20 + getTotalCon() + martialPart) * multiplier * effectMultiplier * 2 * siJin;
 }
 
@@ -389,7 +393,7 @@ const QIANGSHEN_UNLOCKS = [
   { level: 5,   desc: '额外提升 1 根骨' },
   { level: 10,  desc: '额外提升 10 体魄，每秒气血恢复 +10' },
   { level: 30,  desc: '额外提升 100 体魄，每秒气血恢复 +50' },
-  { level: 50,  desc: '额外提升 1000 减伤，从五十重开始每重额外提升 2 体魄' },
+  { level: 50,  desc: '额外提升 150 减伤，从五十重开始每重额外提升 2 体魄' },
   { level: 100, desc: '体魄提升 20%（独立乘区）' }
 ];
 
@@ -430,7 +434,7 @@ function getHpRegen() {
 }
 
 function getExtraDR() {
-  return getQiangshenLevel() >= 50 ? 1000 : 0;
+  return (getQiangshenLevel() >= 50 ? 150 : 0) + (Number(player.bonusDR) || 0);
 }
 
 function getMaxHp() { return Math.floor(80 + getTotalCon() * 20); }

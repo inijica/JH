@@ -1,13 +1,13 @@
 /* NPC 切磋 / 教学相关常量与纯函数（从 game.js 拆出，需在 game.js 之前加载） */
 const SPAR_CD_MS = 10 * 60 * 1000;
 const SPAR_EXP = 1200;
-/* 个别角色的切磋冷却：书童 3 分钟，赵十二/赵铁柱/赵大夫/夏扑萤 10 分钟 */
+/* 个别角色的切磋冷却：书童 3 分钟，赵十二/赵铁柱/赵大夫 10 分钟，夏扑萤 1200 秒 */
 const SPAR_CD_OVERRIDES = {
   shutong: 3 * 60 * 1000,
   zhaoTiezhu: 10 * 60 * 1000,
   zhaoShip: 10 * 60 * 1000,
   zhaoDaifu: 10 * 60 * 1000,
-  xiaPuying: 10 * 60 * 1000
+  xiaPuying: 1200 * 1000
 };
 
 function getSparCdMs(npcId) {
