@@ -8,7 +8,8 @@ const NPC_DEFS = {
     baseCon: 30, baseNeiLi: 15,
     speed: 0.2,
     fist: 55, blade: 25, sword: 25, changbing: 20, qimen: 20, hidden: 20,
-    accuracy: 0.9, evasion: 0.04,
+    accuracy: 0.9, evasion: 0.1,
+    sparExp: 900,
     skills: [
       { id: 'baiduan', name: '百锻锤法',   level: 4,  stat: 'con',   per: 2, note: '伤害倍率0.3，伤害次数2，用体魄代替武学属性；每重体魄+2' },
       { id: 'cuihuo',  name: '淬火呼吸法', level: 2,  stat: 'neiLi', per: 3, note: '每重提升3内力' }
@@ -32,7 +33,8 @@ const NPC_DEFS = {
     baseCon: 25, baseNeiLi: 15,
     speed: 0.25,
     fist: 35, blade: 35, sword: 25, changbing: 25, qimen: 25, hidden: 25,
-    accuracy: 0.9, evasion: 0.05,
+    accuracy: 0.9, evasion: 0.1,
+    sparExp: 900,
     skills: [
       { id: 'gongshu', name: '赵家弓术', level: 5, stat: 'neiLi', per: 3, note: '伤害倍率0.5，伤害次数1，用内力代替武学属性；每重内力+3' }
     ],
@@ -54,7 +56,7 @@ const NPC_DEFS = {
     baseCon: 100, baseNeiLi: 150,
     speed: 0.5,
     fist: 90, blade: 50, sword: 50, changbing: 50, qimen: 50, hidden: 50,
-    accuracy: 1.0, evasion: 0.2,
+    accuracy: 1.0, evasion: 0.3,
     wujiu: true, haoran: true,
     noGrowth: true, sparExp: 5000,
     skills: [
@@ -79,12 +81,12 @@ const NPC_DEFS = {
     medicine: 100,
     accuracy: 1.0, evasion: 0.1,
     jiumai: true, huomai: true, jinzhen: true,
-    noGrowth: false, sparExp: 2200,
+    noGrowth: false, sparExp: 1650,
     skills: [
       { id: 'jiemai',  name: '截脉指',     level: 10, stat: 'fist',   per: 3, note: '伤害次数2，伤害倍率0.15，拳掌属性；每重拳掌+3，命中后附加【截脉】，每层降低0.01行动速度，每3秒消退一层' },
-      { id: 'huomai',  name: '活脉养络法', level: 15, stat: 'neiLi',  per: 5, note: '每重内力+5；战斗中每5秒获得一层【活脉】，每层提供医术/50的每秒生命恢复' },
-      { id: 'jinzhen', name: '金针渡穴',   level: 12, stat: 'hidden', per: 3, note: '每重暗器+3；恢复医术×5点生命，之后停止自己行动3秒，每场战斗限一次' }
+      { id: 'huomai',  name: '活脉养络法', level: 15, stat: 'neiLi',  per: 3, note: '每重内力+3；战斗中每5秒获得一层【活脉】，每层提供医术/50的每秒生命恢复' }
     ],
+    techniques: ['金针渡穴（特技）'],
     attack: { name: '截脉指', multiplier: 0.15, hits: 2, stat: 'fist' },
     greeting: '“呵呵.....是铁柱家的孩子啊。”',
     chat: [
@@ -104,7 +106,7 @@ const NPC_DEFS = {
     baseCon: 12, baseNeiLi: 20,
     speed: 0.2,
     fist: 18, blade: 10, sword: 10, changbing: 10, qimen: 10, hidden: 10,
-    accuracy: 0.9, evasion: 0.04,
+    accuracy: 0.9, evasion: 0.1,
     sparExp: 500,
     skills: [
       { id: 'shutong_wangba', name: '王八拳', level: 1, stat: 'fist', per: 2, conPer: 1, note: '伤害倍率0.25，伤害次数1，拳法属性；每重拳掌+2、体魄+1' }

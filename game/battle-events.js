@@ -272,10 +272,10 @@ function finishBattleEventPlayback() {
 
 /* ================= 白衣怪人剧情战事件 ================= */
 
-/* 白衣怪人：五狗屠龙阵的狗狗属性 ×2，招式效果相同，换个名字，且不带连携机制 */
+/* 白衣怪人：五狗屠龙阵的狗狗属性 ×1.2，招式效果相同，换个名字，且不带连携机制 */
 function makeWhiteRobeEnemy(index) {
   const s = DREAM_DOG_STATS;
-  const M = 2;
+  const M = 1.2;
   const con = s.con * M;
   const maxHp = Math.round(80 + con * 20);
   const suffix = ['壹', '贰', '叁', '肆', '伍', '陆', '柒'][index] || String(index + 1);

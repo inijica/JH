@@ -3,7 +3,8 @@ function defaultStrategy() {
   return {
     enabled: false,
     rounds: Array.from({ length: 10 }, () => ({ skillId: '', maxUses: -1 })),
-    lowHp: { threshold: 30, skillId: '' }
+    lowHp: { threshold: 30, skillId: '' },
+    allyLowHp: { threshold: 30, skillId: '' }
   };
 }
 
@@ -26,6 +27,13 @@ function normalizeStrategy(raw) {
   if (!Number.isFinite(th)) th = 30;
   s.lowHp.threshold = Math.max(1, Math.min(100, Math.floor(th)));
   if (typeof s.lowHp.skillId !== 'string') s.lowHp.skillId = '';
+
+  if (!s.allyLowHp || typeof s.allyLowHp !== 'object') s.allyLowHp = { threshold: 30, skillId: '' };
+  let ath = Number(s.allyLowHp.threshold);
+  if (!Number.isFinite(ath)) ath = 30;
+  s.allyLowHp.threshold = Math.max(1, Math.min(100, Math.floor(ath)));
+  if (typeof s.allyLowHp.skillId !== 'string') s.allyLowHp.skillId = '';
+
   if (typeof s.enabled !== 'boolean') s.enabled = false;
   return s;
 }
@@ -84,28 +92,71 @@ function tryLowHpStrategy() {
   if (pct > s.lowHp.threshold) return false;
   const sid = s.lowHp.skillId;
   if (sid === 'feishipo' && getFeishipoLevel() > 0) {
-    addLog('【战斗策略】气血过低，立刻施展飞石破！', 'crit');
+    addLog('【战斗策略】自身气血过低，立刻施展飞石破！', 'crit');
     doFeishipoAttack();
     return true;
   }
   if (sid === 'zhenshan') {
-    addLog('【战斗策略】气血过低，立刻施展震山拳！', 'crit');
+    addLog('【战斗策略】自身气血过低，立刻施展震山拳！', 'crit');
     doZhenshanAttack();
     return true;
   }
   if (sid === 'jiusi' && getJiusiLevel() > 0) {
-    addLog('【战斗策略】气血过低，立刻施展九思剑法！', 'crit');
+    addLog('【战斗策略】自身气血过低，立刻施展九思剑法！', 'crit');
     doJiusiAttack();
     return true;
   }
   if (sid === 'paodingDao' && hasPaodingDao()) {
-    addLog('【战斗策略】气血过低，立刻施展庖丁刀法！', 'crit');
+    addLog('【战斗策略】自身气血过低，立刻施展庖丁刀法！', 'crit');
     doPaodingDaoAttack();
     return true;
   }
   if (sid === 'jinzhen' && typeof hasJinzhenTechnique === 'function' && hasJinzhenTechnique()) {
-    addLog('【战斗策略】气血过低，立刻施展金针渡穴！', 'crit');
-    doPlayerJinzhen();
+    const me = typeof playerFighter === 'function' ? playerFighter() : null;
+    if (!me || me.hp <= 0 || me.jinzhenUsed || me.hp >= me.maxHp) return false;
+    addLog('【战斗策略】自身气血过低，立刻施展金针渡穴！', 'crit');
+    doPlayerJinzhen(me);
+    return true;
+  }
+  return false;
+}
+
+function tryAllyLowHpStrategy() {
+  const s = ensureStrategy();
+  if (!s.enabled) return false;
+  if (!s.allyLowHp || !s.allyLowHp.skillId) return false;
+  const injured = (battle.allies || [])
+    .filter(f => f && !f.isPlayer && f.hp > 0 && f.maxHp > 0 && (f.hp / f.maxHp * 100) <= s.allyLowHp.threshold)
+    .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
+  if (!injured.length) return false;
+  const targetAlly = injured[0];
+  const sid = s.allyLowHp.skillId;
+
+  if (sid === 'jinzhen' && typeof hasJinzhenTechnique === 'function' && hasJinzhenTechnique()) {
+    const me = typeof playerFighter === 'function' ? playerFighter() : null;
+    if (!me || me.hp <= 0 || me.jinzhenUsed || targetAlly.hp >= targetAlly.maxHp) return false;
+    addLog(`【战斗策略】同伴${targetAlly.name}气血过低，立刻对其施展金针渡穴！`, 'crit');
+    doPlayerJinzhen(targetAlly);
+    return true;
+  }
+  if (sid === 'feishipo' && getFeishipoLevel() > 0) {
+    addLog(`【战斗策略】同伴${targetAlly.name}气血过低，立刻施展飞石破！`, 'crit');
+    doFeishipoAttack();
+    return true;
+  }
+  if (sid === 'zhenshan') {
+    addLog(`【战斗策略】同伴${targetAlly.name}气血过低，立刻施展震山拳！`, 'crit');
+    doZhenshanAttack();
+    return true;
+  }
+  if (sid === 'jiusi' && getJiusiLevel() > 0) {
+    addLog(`【战斗策略】同伴${targetAlly.name}气血过低，立刻施展九思剑法！`, 'crit');
+    doJiusiAttack();
+    return true;
+  }
+  if (sid === 'paodingDao' && hasPaodingDao()) {
+    addLog(`【战斗策略】同伴${targetAlly.name}气血过低，立刻施展庖丁刀法！`, 'crit');
+    doPaodingDaoAttack();
     return true;
   }
   return false;
@@ -121,6 +172,23 @@ function tryBondLowHpStrategy(f) {
   const opt = getBondBattleSkillOptions().find(o => o.id === s.lowHp.skillId);
   if (!opt) return '';
   addLog(`【羁绊战斗策略】${f.name}气血过低，立刻施展${opt.name}！`, 'crit');
+  return opt.id;
+}
+
+function tryBondAllyLowHpStrategy(f) {
+  const s = ensureBondStrategy();
+  if (!s.enabled) return '';
+  if (!s.allyLowHp || !s.allyLowHp.skillId) return '';
+  if (!f || f.hp <= 0) return '';
+  const injured = (battle.allies || [])
+    .filter(a => a && a !== f && a.hp > 0 && a.maxHp > 0 && (a.hp / a.maxHp * 100) <= s.allyLowHp.threshold)
+    .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
+  if (!injured.length) return '';
+  const targetAlly = injured[0];
+  const opt = getBondBattleSkillOptions().find(o => o.id === s.allyLowHp.skillId);
+  if (!opt) return '';
+  const label = targetAlly.isPlayer ? '你' : `同伴${targetAlly.name}`;
+  addLog(`【羁绊战斗策略】${label}气血过低，${f.name}立刻施展${opt.name}！`, 'crit');
   return opt.id;
 }
 
@@ -174,9 +242,9 @@ function renderStrategyUI() {
   const s = ensureStrategy();
   const enableEl = $('strategyEnable');
   if (enableEl) enableEl.checked = !!s.enabled;
+  const opts = getBattleSkillOptions();
   const roundsEl = $('strategyRounds');
   if (roundsEl) {
-    const opts = getBattleSkillOptions();
     roundsEl.innerHTML = s.rounds.map((r, i) => {
       const optHtml = '<option value="">— 不选择 —</option>' + opts.map(o =>
         `<option value="${o.id}" ${r.skillId === o.id ? 'selected' : ''}>${o.name}</option>`
@@ -193,10 +261,19 @@ function renderStrategyUI() {
   if (pctEl) pctEl.value = s.lowHp.threshold;
   const lowSkillEl = $('strategyLowHpSkill');
   if (lowSkillEl) {
-    const opts = getBattleSkillOptions();
     lowSkillEl.innerHTML = '<option value="">— 不启用 —</option>' + opts.map(o =>
       `<option value="${o.id}" ${s.lowHp.skillId === o.id ? 'selected' : ''}>${o.name}</option>`
     ).join('');
+    lowSkillEl.value = opts.some(o => o.id === s.lowHp.skillId) ? s.lowHp.skillId : '';
+  }
+  const allyPctEl = $('strategyAllyLowHpPct');
+  if (allyPctEl) allyPctEl.value = s.allyLowHp.threshold;
+  const allySkillEl = $('strategyAllyLowHpSkill');
+  if (allySkillEl) {
+    allySkillEl.innerHTML = '<option value="">— 不启用 —</option>' + opts.map(o =>
+      `<option value="${o.id}" ${s.allyLowHp.skillId === o.id ? 'selected' : ''}>${o.name}</option>`
+    ).join('');
+    allySkillEl.value = opts.some(o => o.id === s.allyLowHp.skillId) ? s.allyLowHp.skillId : '';
   }
 }
 
@@ -239,6 +316,16 @@ function saveStrategyFromUI() {
   }
   const lowSkillEl = $('strategyLowHpSkill');
   if (lowSkillEl) s.lowHp.skillId = lowSkillEl.value;
+
+  const allyPctEl = $('strategyAllyLowHpPct');
+  if (allyPctEl) {
+    let ath = Number(allyPctEl.value);
+    if (!Number.isFinite(ath)) ath = 30;
+    s.allyLowHp.threshold = Math.max(1, Math.min(100, Math.floor(ath)));
+  }
+  const allySkillEl = $('strategyAllyLowHpSkill');
+  if (allySkillEl) s.allyLowHp.skillId = allySkillEl.value;
+
   battle.strategyCursor = 0;
   battle.strategyRemaining = s.rounds.map(r => r.maxUses);
   saveGame();
@@ -273,6 +360,15 @@ function renderBondBattleStrategyUI() {
       `<option value="${o.id}" ${s.lowHp.skillId === o.id ? 'selected' : ''}>${o.name}</option>`
     ).join('');
     lowSkillEl.value = opts.some(o => o.id === s.lowHp.skillId) ? s.lowHp.skillId : '';
+  }
+  const allyPctEl = $('bondBattleStrategyAllyLowHpPct');
+  if (allyPctEl) allyPctEl.value = s.allyLowHp.threshold;
+  const allySkillEl = $('bondBattleStrategyAllyLowHpSkill');
+  if (allySkillEl) {
+    allySkillEl.innerHTML = '<option value="">— 不启用 —</option>' + opts.map(o =>
+      `<option value="${o.id}" ${s.allyLowHp.skillId === o.id ? 'selected' : ''}>${o.name}</option>`
+    ).join('');
+    allySkillEl.value = opts.some(o => o.id === s.allyLowHp.skillId) ? s.allyLowHp.skillId : '';
   }
 }
 
@@ -315,6 +411,16 @@ function saveBondBattleStrategyFromUI() {
   }
   const lowSkillEl = $('bondBattleStrategyLowHpSkill');
   if (lowSkillEl) s.lowHp.skillId = lowSkillEl.value;
+
+  const allyPctEl = $('bondBattleStrategyAllyLowHpPct');
+  if (allyPctEl) {
+    let ath = Number(allyPctEl.value);
+    if (!Number.isFinite(ath)) ath = 30;
+    s.allyLowHp.threshold = Math.max(1, Math.min(100, Math.floor(ath)));
+  }
+  const allySkillEl = $('bondBattleStrategyAllyLowHpSkill');
+  if (allySkillEl) s.allyLowHp.skillId = allySkillEl.value;
+
   battle.bondStrategyCursor = 0;
   battle.bondStrategyRemaining = s.rounds.map(r => r.maxUses);
   saveGame();

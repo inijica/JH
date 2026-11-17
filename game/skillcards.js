@@ -43,7 +43,7 @@ const SKILL_CARD_BUILDERS = {
       <div class="skill-card-row">伤害次数：<b>${st.hits}</b></div>
       <div class="skill-card-row">伤害倍率：<b>${st.multiplier}</b></div>
       <div class="skill-card-row">【撼山势】：施展后叠加 1 层，上限 <b>${HANSHAN_MAX_LAYERS}</b> 层${lv >= 100 ? '；战斗中每秒自动叠加 1 层' : ''}</div>
-      <div class="skill-card-row">每层使攻击附加 <b>${HANSHAN_CON_PER_LAYER}×体魄</b> 的基础伤害（计入攻防计算）${lv >= 100 ? '，百重翻倍为 <b>0.1×体魄</b>' : ''}</div>
+      <div class="skill-card-row">每层使攻击附加 <b>${HANSHAN_CON_PER_LAYER}×体魄</b> 的基础伤害（计入攻防计算）${lv >= 100 ? `，百重翻倍为 <b>${fmtBondStat(HANSHAN_CON_PER_LAYER * 2)}×体魄</b>` : ''}</div>
       <div class="skill-card-row">当前每层附加：<b>${fmtNum(Math.round(perLayer * 100) / 100)}</b>　满层附加：<b>${fmtNum(Math.round(perLayer * HANSHAN_MAX_LAYERS * 10) / 10)}</b></div>`;
     return { rows, unlockHtml: renderUnlockList(WANGBA_UNLOCKS, lv) };
   },
@@ -223,11 +223,10 @@ function buildJinzhenTechniqueCard() {
   if (!getJinzhenTechnique()) return '';
   return `<div class="skill-card">
     <div class="skill-card-name">金针渡穴</div>
-    <div class="skill-card-intro">赵大夫倾囊相授的毕生针法。取金针疏通经络，可在危急时为同伴续上一口气。</div>
+    <div class="skill-card-intro">赵大夫倾囊相授的毕生针法。取金针疏通经络，可在危急时为自己或同伴续上一口气。</div>
     <div class="skill-card-row">类型：<b>特技</b></div>
-    <div class="skill-card-row">效果：恢复医术×5 点气血，随后停止行动 3 秒</div>
+    <div class="skill-card-row">效果：为自己或同伴恢复医术×5 点气血，随后停止行动 3 秒</div>
     <div class="skill-card-row">限制：<b>每场战斗最多使用一次</b></div>
-    <div class="skill-card-row">可装备位置：<b>战斗策略</b>的任意回合或低血线技能</div>
   </div>`;
 }
 

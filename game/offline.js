@@ -140,7 +140,9 @@ function updateOfflineBonusUI() {
 
 /* 离开时正在垂钓：重新登录后继续垂钓（不结算离线收获） */
 function resumeOfflineFishing() {
-  if (typeof storyFlags === 'undefined' || !storyFlags.fishingUnlocked || storyFlags.leftVillage) return;
+  if (typeof storyFlags === 'undefined') return;
+  if (!storyFlags.fishingUnlocked && !storyFlags.arrivedCapital) return;
+  if (storyFlags.leftVillage && !storyFlags.arrivedCapital) return;
   if (typeof battleActive === 'function' && battleActive()) return;
   if (typeof fishing === 'undefined' || fishing.running) return;
   if (typeof startFishing === 'function') startFishing(getGameClockMs());
@@ -149,10 +151,14 @@ function resumeOfflineFishing() {
 /* 离开时正在烤鱼：保留已入炉的食材并恢复烹饪进度（不结算离线收获） */
 function resumeOfflineCooking(cookingInfo) {
   if (!cookingInfo || !Array.isArray(cookingInfo.pending) || !cookingInfo.pending.length) return;
-  if (typeof storyFlags !== 'undefined' && storyFlags.leftVillage) return;
+  if (typeof storyFlags !== 'undefined' && storyFlags.leftVillage && !storyFlags.arrivedCapital) return;
   if (typeof cookingState === 'undefined' || typeof COOK_RECIPES === 'undefined') return;
   const items = cookingInfo.pending
-    .map(it => ({ fishId: it && it.fishId, weight: Number(it && it.weight) || 0 }))
+    .map(it => ({
+      fishId: it && it.fishId,
+      weight: Number(it && it.weight) || 0,
+      fishQuality: it && it.fishQuality != null && Number.isFinite(Number(it.fishQuality)) ? Number(it.fishQuality) : null
+    }))
     .filter(it => typeof ITEM_DEFS !== 'undefined' && ITEM_DEFS[it.fishId]);
   if (!items.length) return;
   cookingState.recipe = COOK_RECIPES[cookingInfo.recipe] ? cookingInfo.recipe : 'kaoyu';

@@ -103,7 +103,8 @@ const player = {
       { skillId: '', maxUses: -1 },
       { skillId: '', maxUses: -1 }
     ],
-    lowHp: { threshold: 30, skillId: '' }
+    lowHp: { threshold: 30, skillId: '' },
+    allyLowHp: { threshold: 30, skillId: '' }
   },
   bondStrategy: {
     enabled: false,
@@ -119,7 +120,8 @@ const player = {
       { skillId: '', maxUses: -1 },
       { skillId: '', maxUses: -1 }
     ],
-    lowHp: { threshold: 30, skillId: '' }
+    lowHp: { threshold: 30, skillId: '' },
+    allyLowHp: { threshold: 30, skillId: '' }
   }
 };
 
@@ -364,11 +366,20 @@ function updateDepartBtn() {
   btn.style.display = show ? '' : 'none';
 }
 
+function updateArriveBtn() {
+  const btn = $('arriveBtn');
+  if (!btn) return;
+  const show = !!storyFlags.leftVillage && !storyFlags.arrivedCapital;
+  btn.style.display = show ? '' : 'none';
+}
+
 function updateMapView() {
   const zj = $('zhaojiaMap');
   const cm = $('carriageMap');
-  if (zj) zj.style.display = storyFlags.leftVillage ? 'none' : '';
-  if (cm) cm.style.display = storyFlags.leftVillage ? '' : 'none';
+  const cap = $('capitalMap');
+  if (zj) zj.style.display = (!storyFlags.leftVillage && !storyFlags.arrivedCapital) ? '' : 'none';
+  if (cm) cm.style.display = (storyFlags.leftVillage && !storyFlags.arrivedCapital) ? '' : 'none';
+  if (cap) cap.style.display = storyFlags.arrivedCapital ? '' : 'none';
 }
 
 function renderMainTab() {
@@ -386,6 +397,7 @@ function renderMainTab() {
   updateBuSuzhikeNpc();
   updatePeiWenxiuHomeNpc();
   updateDepartBtn();
+  updateArriveBtn();
   updateLiQianyuanNpc();
 }
 
@@ -438,6 +450,7 @@ const storyFlags = {
   peiPostTalkDone: false,
   departUnlocked: false,
   leftVillage: false,
+  arrivedCapital: false,
   farewellTiezhu: false,
   farewellShip: false,
   farewellDaifu: false,
@@ -981,12 +994,53 @@ function confirmDepart() {
   }
   updateMapView();
   updateDepartBtn();
+  updateArriveBtn();
   updatePeiWenxiuHomeNpc();
   updateLiQianyuanNpc();
   updateTrainingUI();
   saveGame();
   addIntel('你与夏扑萤、裴文秀乘上马车，离开赵家村前往京城。', 'good');
   showToast('已启程离开赵家村，前往京城');
+}
+
+function openArriveModal() {
+  if (!storyFlags.leftVillage || storyFlags.arrivedCapital) return;
+  const modal = $('arriveModal');
+  if (modal) modal.classList.add('show');
+}
+
+function closeArriveModal() {
+  const modal = $('arriveModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function confirmArrive() {
+  closeArriveModal();
+  if (!storyFlags.leftVillage || storyFlags.arrivedCapital) return;
+  storyFlags.arrivedCapital = true;
+  storyFlags.fishingUnlocked = true;
+  storyFlags.cookingUnlocked = true;
+  ensureFishingTechnique();
+  ensurePaodingTechnique();
+  if (typeof cancelFishing === 'function') cancelFishing();
+  if (typeof cookingState !== 'undefined' && cookingState && cookingState.running) {
+    cookingState.running = false;
+    cookingState.selected = {};
+    cookingState.pending = [];
+    const ov = $('cookingOverlay');
+    if (ov) ov.classList.remove('show');
+  }
+  if (player.trainingActivity && !['capitalInternal', 'stoneLock', 'waterPlum', 'sparPractice'].includes(player.trainingActivity)) {
+    stopTraining();
+  }
+  updateMapView();
+  updateArriveBtn();
+  updateFishingBtn();
+  updateTrainingUI();
+  renderTechniques();
+  saveGame();
+  addIntel('马车驶入朱雀长街，你们终于抵达京城，暂居于裴文秀寻得的一处清净小宅。', 'good');
+  showToast('已抵达京城');
 }
 
 const npcPeiWenxiuHomeEl = $('npcPeiWenxiuHome');
@@ -1016,17 +1070,36 @@ if (departModalEl) {
   });
 }
 
+const arriveBtnEl = $('arriveBtn');
+if (arriveBtnEl) {
+  arriveBtnEl.addEventListener('click', openArriveModal);
+}
+const arriveConfirmBtnEl = $('arriveConfirmBtn');
+if (arriveConfirmBtnEl) {
+  arriveConfirmBtnEl.addEventListener('click', confirmArrive);
+}
+const arriveCancelBtnEl = $('arriveCancelBtn');
+if (arriveCancelBtnEl) {
+  arriveCancelBtnEl.addEventListener('click', closeArriveModal);
+}
+const arriveModalEl = $('arriveModal');
+if (arriveModalEl) {
+  arriveModalEl.addEventListener('click', (e) => {
+    if (e.target === arriveModalEl) closeArriveModal();
+  });
+}
+
 const npcXiaPuyingCarriageEl = $('npcXiaPuyingCarriage');
 if (npcXiaPuyingCarriageEl) {
   npcXiaPuyingCarriageEl.addEventListener('click', () => {
-    if (!storyFlags.leftVillage) return;
+    if (!storyFlags.leftVillage || storyFlags.arrivedCapital) return;
     showDialogNode('carriageXia');
   });
 }
 const npcPeiWenxiuCarriageEl = $('npcPeiWenxiuCarriage');
 if (npcPeiWenxiuCarriageEl) {
   npcPeiWenxiuCarriageEl.addEventListener('click', () => {
-    if (!storyFlags.leftVillage) return;
+    if (!storyFlags.leftVillage || storyFlags.arrivedCapital) return;
     showDialogNode('carriagePei');
   });
 }
@@ -1070,6 +1143,13 @@ const fishingBtnEl = $('fishingBtn');
 if (fishingBtnEl) {
   fishingBtnEl.addEventListener('click', () => {
     if (!storyFlags.fishingUnlocked) return;
+    startFishing();
+  });
+}
+const capitalFishingBtnEl = $('capitalFishingBtn');
+if (capitalFishingBtnEl) {
+  capitalFishingBtnEl.addEventListener('click', () => {
+    if (!storyFlags.arrivedCapital) return;
     startFishing();
   });
 }
@@ -1170,11 +1250,11 @@ const BOND_SKILL_TEACH = {
 
 const BOND_SKILL_STARS = { qingyuan: 2, feishipo: 1, tanafa: 0 };
 const BOND_TENDENCY_BONUS_PER_STAR = 0.2;
-/* 向羁绊角色请教：1800 秒冷却 */
-const BOND_TEACH_CD_MS = 1800 * 1000;
+/* 向羁绊角色请教：1200 秒冷却 */
+const BOND_TEACH_CD_MS = 1200 * 1000;
 const BOND_TEACH_ID = 'xiaPuyingTeach';
-/* 指点羁绊角色武功：1800 秒冷却 */
-const BOND_GUIDE_CD_MS = 1800 * 1000;
+/* 指点羁绊角色武功：1200 秒冷却 */
+const BOND_GUIDE_CD_MS = 1200 * 1000;
 const BOND_GUIDE_ID = 'xiaPuyingGuide';
 const BOND_SKILL_MAX_LEVEL = 100;
 const BOND_CULT_INTERVAL_MS = 60 * 60 * 1000;
@@ -1466,7 +1546,7 @@ function makeBondSparEnemy() {
     qimen: qimen + extraStats.qimen,
     hidden: hidden + extraStats.hidden,
     accuracy: 0.9 + qy * 0.0075,
-    evasion: 0.05 + qy * 0.01 + (qy >= 25 ? 0.1 : 0),
+    evasion: 0.10 + qy * 0.01 + (qy >= 25 ? 0.1 : 0),
     root: getBondRoot(),
     comp: getBondComp(),
     luck: getBondLuck(),
@@ -1507,6 +1587,7 @@ function startBondSpar() {
   const bondSparNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   battle.lastPozhanAt = bondSparNow;
   battle.jiumaiNextAt = bondSparNow + JIUMAI_DECAY_MS;
+  battle.lastWeirdPoisonAt = 0;
   battle.sparNpcId = BOND_SPAR_ID;
   battle.dreamId = '';
   battle.storyBattleId = '';
@@ -1599,7 +1680,7 @@ const PEI_WENXIU_STATS = {
   qimen: 3000,
   hidden: 3000,
   accuracy: 3.5,
-  evasion: 3.25
+  evasion: 3.35
 };
 
 function makePeiWenxiuEnemy() {
@@ -1607,7 +1688,7 @@ function makePeiWenxiuEnemy() {
   const maxHp = Math.round(80 + s.con * 20);
   return {
     name: '裴文秀',
-    npcId: '',
+    npcId: 'peiWenxiu',
     hp: maxHp,
     maxHp,
     atk: 0,
@@ -1631,6 +1712,7 @@ function makePeiWenxiuEnemy() {
     memory: {},
     confused: false,
     isSpar: true,
+    peiTurnCount: 0,
     peiFirstDone: false
   };
 }
@@ -1651,6 +1733,7 @@ function prepareStoryBattle() {
   const storyBattleNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   battle.lastPozhanAt = storyBattleNow;
   battle.jiumaiNextAt = storyBattleNow + JIUMAI_DECAY_MS;
+  battle.lastWeirdPoisonAt = 0;
   battle.sparNpcId = '';
   battle.dreamId = '';
   battle.forfeited = false;
@@ -1675,7 +1758,6 @@ function startPeiWenxiuStoryBattle() {
   const pauseBtn = $('battlePauseBtn');
   if (pauseBtn) pauseBtn.textContent = '暂 停 战 斗';
   addLog('【裴文秀】“兄长，得罪了。”', '');
-  addLog('（切磋的胜负都会回到对话，先掂量一下彼此的分量吧。）', '');
   renderBattleStructure();
   updateBattleUI();
   mainView = 'village';
@@ -1695,7 +1777,12 @@ function storyBattleEnemyAction(e) {
 }
 
 function peiWenxiuTurn(e) {
-  if (!e.peiFirstDone) {
+  e.peiTurnCount = (Number(e.peiTurnCount) || 0) + 1;
+  if (e.peiTurnCount <= 2) {
+    addLog(`【裴文秀】${e.name}负剑而立，静观你的招式，并未出手。`, '');
+    return;
+  }
+  if (e.peiTurnCount === 3 || !e.peiFirstDone) {
     e.peiFirstDone = true;
     addLog('【一点惊鸿】只见她虚拉弓弦，下一瞬，随着一声长啸，滔天气浪喷薄而出，却又于半空之中凝缩一点，朝你飞掠而来。', 'crit');
     addLog('霎时间，只听天地震荡，山川惊泣。', '');
@@ -1770,6 +1857,7 @@ function peiWenxiuStrike(e, opts) {
 function storyBattleAfterAttack(info) {
   if (battle.storyBattleId !== 'peiWenxiu' || battle.over) return;
   if (!info || !info.target || info.target.npcId !== 'peiWenxiu') return;
+  if ((Number(info.target.peiTurnCount) || 0) < 3) return;
   if (info.hitSegments > 0 || info.missSegments <= 0) return;
   peiWenxiuCounter(info.attacker);
 }
@@ -1860,7 +1948,7 @@ function getBondExtraMartialStats() {
       return;
     }
     if (id === 'qiangshen') {
-      extra.con += 2 + lv * 2 + (lv >= 10 ? 10 : 0) + (lv >= 30 ? 30 : 0) + (lv > 50 ? (lv - 50) * 2 : 0);
+      extra.con += 2 + lv * 2 + (lv >= 10 ? 10 : 0) + (lv >= 30 ? 100 : 0) + (lv > 50 ? (lv - 50) * 2 : 0);
       if (typeof getQiangshenRootBonus === 'function') extra.root += getQiangshenRootBonus(lv);
       if (lv >= 100) extra.conMult *= 1.2;
       return;
@@ -2054,13 +2142,10 @@ function bondTeach(targetId) {
 
 function openBondTeachPicker() {
   if (!Array.isArray(player.skills)) player.skills = [];
-  const unlearned = BOND_SKILL_ORDER.filter(id => !player.skills.some(s => s && s.id === id));
-  const ids = unlearned.length ? unlearned : BOND_SKILL_ORDER.slice();
+  const ids = BOND_SKILL_ORDER.slice();
   openBondModal({
     title: '向 夏 扑 萤 请 教',
-    desc: unlearned.length
-      ? '选择一门尚未学会的武功请教。每次请教后有 1800 秒冷却。'
-      : '三门武功你均已学会，可选择一门请教修炼经验。每次请教后有 1800 秒冷却。',
+    desc: '选择一门武功请教：未习得可直接学会，已习得可获得五分钟修炼经验。每次请教后有 1200 秒冷却。',
     bodyHtml: '<div class="bond-modal-list" id="bondTeachList"></div>',
     onMount: () => {
       const list = $('bondTeachList');
@@ -2271,30 +2356,32 @@ function bondGuide() {
   const options = getBondKnownSkillIds().map(id => {
     const mine = player.skills.find(s => s && s.id === id);
     return { id, mine, bondLevel: Number(b.levels[id]) || 0 };
-  }).filter(o => o.mine && o.bondLevel < BOND_SKILL_MAX_LEVEL);
+  }).filter(o => o.mine && o.bondLevel < Math.floor((Number(o.mine.level) || 1) * 0.8));
   if (!options.length) {
-    showToast('没有可指点的武功：需你已学会，且夏扑萤未满百重');
+    showToast('没有可指点的武功：需你已学会，且夏扑萤当前重数低于你重数的 80%');
     return;
   }
   openBondModal({
     title: '指 点 武 功',
-    desc: '重数提升 = 你的重数 ÷ 10（至少 1，上限百重）。每次指点后有 1800 秒冷却。',
+    desc: '重数提升 = 你的重数 ÷ 20（最低为 1），指点后不超过你重数的 80%。每次指点后有 1200 秒冷却。',
     bodyHtml: '<div class="bond-modal-list" id="bondGuideList"></div>',
     onMount: () => {
       const list = $('bondGuideList');
       if (!list) return;
       options.forEach(o => {
-        const gain = Math.max(1, Math.floor((Number(o.mine.level) || 1) / 10));
-        const realGain = Math.min(BOND_SKILL_MAX_LEVEL, o.bondLevel + gain) - o.bondLevel;
+        const playerLv = Math.max(1, Number(o.mine.level) || 1);
+        const cap = Math.floor(playerLv * 0.8);
+        const gain = Math.max(1, Math.floor(playerLv / 20));
+        const realGain = Math.max(0, Math.min(cap, o.bondLevel + gain) - o.bondLevel);
         list.appendChild(makeBondModalItem(
           o.id,
-          `夏扑萤 ${levelToChinese(o.bondLevel)}重 · 你 ${levelToChinese(o.mine.level)}重 · 可提升 ${realGain} 重`,
+          `夏扑萤 ${levelToChinese(o.bondLevel)}重 · 你 ${levelToChinese(playerLv)}重 · 上限 ${levelToChinese(cap)}重 · 可提升 ${realGain} 重`,
           () => {
             closeBondModal();
             const current = Number(b.levels[o.id]) || 0;
-            const actual = Math.min(BOND_SKILL_MAX_LEVEL, current + gain) - current;
+            const actual = Math.max(0, Math.min(cap, current + gain) - current);
             if (actual <= 0) {
-              showToast('此武功已至百重');
+              showToast('此武功已达你重数的 80% 上限');
               return;
             }
             b.levels[o.id] = current + actual;
@@ -2340,7 +2427,9 @@ if (intelCompanionFilterEl) {
 /* ================= 羁绊陪伴事件 ================= */
 function getCompanionActiveActivities() {
   const types = [];
-  if (fishing.running) types.push('fishing');
+  if (fishing.running) {
+    types.push(storyFlags.arrivedCapital ? 'capitalFishing' : 'fishing');
+  }
   const act = player.trainingActivity;
   if (act && TRAINING_ACTIVITY[act]) {
     if (act !== 'dummy' || getTrainingSkillForActivity()) types.push(act);
@@ -2355,7 +2444,9 @@ function triggerCompanionEvent(type) {
 
   if (type === 'fishing') {
     intel('你静坐着钓鱼，夏扑萤就安静地拿着树枝在泥土上画画，画上有你，还有她。', '');
+    player.luck = (Number(player.luck) || 0) + 1;
     growth.luck += 1;
+    intel('你的定力 +1，夏扑萤定力 +1，羁绊 +10。', 'good');
   } else if (type === 'external') {
     intel('你任凭瀑布冲刷着自己的身体，夏扑萤却在旁边钓起了鱼。', '');
     const s = player.gender === '女' ? '姐' : '哥';
@@ -2363,36 +2454,63 @@ function triggerCompanionEvent(type) {
     const qMult = 1 + getBondValue() / 100;
     for (let i = 0; i < 3; i++) {
       const q = rollFishingQuality() * qMult;
-      addItem('chilinyu', 1, { weight: rollFishWeight('chilinyu', q) });
+      addItem('chilinyu', 1, { weight: rollFishWeight('chilinyu', q), quality: q });
     }
-    intel('她钓起三尾赤鳞鱼，全都送给了你。', 'good');
+    player.root = (Number(player.root) || 0) + 1;
+    intel('她钓起三尾赤鳞鱼，全都送给了你。（你的根骨 +1，夏扑萤羁绊 +10）', 'good');
   } else if (type === 'internal') {
     intel('你打坐入定，夏扑萤耐着性子在一旁滚来滚去，憋红了脸也不敢出声闹你。', '');
     intel('最终，她试探着躺到你的膝盖上，见你没有反应，便安心地闭上了眼睛，酣然入睡。', 'good');
-    growth.luck += 1;
+    player.neiLi = (Number(player.neiLi) || 0) + 5;
+    intel('你的内力 +5，夏扑萤羁绊 +10。', 'good');
   } else if (type === 'dummy') {
-    const skill = getTrainingSkillForActivity();
-    if (!skill) return false;
     intel('你打着木桩，夏扑萤在身后变着法子给你搞怪加油，你强忍着笑意，感觉更有干劲了。', '');
-    const exp = getSkillTrainingExpPerMinute(
-      skill,
-      TRAINING_ACTIVITY.dummy.interactionEfficiency,
-      player.trainingOtherBonus
-    ) * 10;
-    addSkillExp(skill, exp);
-    intel(`【${skill.name}】获得经验 ${Math.round(exp)}。`, 'good');
-    renderSkills();
+    player.comp = (Number(player.comp) || 0) + 1;
+    intel('你的悟性 +1，夏扑萤羁绊 +10。', 'good');
   } else if (type === 'plum') {
     intel('你踩着梅花桩练功，夏扑萤待在下面，眼睛一眨不眨地看着你，屏息凝神，生怕你一个不慎跌落下来，随时准备着冲上前将你接住。', '');
     intel('即使她知道，这点高度根本伤不到你。', '');
     intel('你感到有些安心。', 'good');
-    intel('你和夏扑萤的羁绊额外提升了10点。', 'good');
+    player.luck = (Number(player.luck) || 0) + 1;
     bondGain += 10;
+    intel('你的定力 +1，你和夏扑萤的羁绊总共提升了 20 点。', 'good');
+  } else if (type === 'capitalInternal') {
+    bondGain = 5;
+    intel('你打坐入定，夏扑萤耐着性子在一旁滚来滚去，憋红了脸也不敢出声闹你。', '');
+    intel('最终，她试探着躺到你的膝盖上，见你没有反应，便安心地闭上了眼睛，酣然入睡。', 'good');
+    player.neiLi = (Number(player.neiLi) || 0) + 30;
+    intel('你的内力 +30，夏扑萤羁绊 +5。', 'good');
+  } else if (type === 'stoneLock') {
+    bondGain = 5;
+    intel('你拿石锁锤炼身体，夏扑萤却在身后给你按摩肩膀，你一时之间哭笑不得。', '');
+    player.root = (Number(player.root) || 0) + 2;
+    growth.root += 1;
+    intel('你的根骨 +2，夏扑萤根骨 +1，羁绊 +5。', 'good');
+  } else if (type === 'waterPlum') {
+    bondGain = 5;
+    intel('你在梅桩上翻转腾挪，夏扑萤则坐在椅子上悠闲地吃着果子，时不时给你加油鼓劲。', '');
+    player.luck = (Number(player.luck) || 0) + 2;
+    growth.comp += 1;
+    intel('你的定力 +2，夏扑萤悟性 +1，羁绊 +5。', 'good');
+  } else if (type === 'sparPractice') {
+    bondGain = 5;
+    intel('你与他人对练过招，夏扑萤一边给你加油，一边时不时地悄悄用小石子偷袭你的对手.......', '');
+    player.comp = (Number(player.comp) || 0) + 2;
+    growth.comp += 1;
+    intel('你的悟性 +2，夏扑萤悟性 +1，羁绊 +5。', 'good');
+  } else if (type === 'capitalFishing') {
+    bondGain = 5;
+    intel('你静坐着钓鱼，夏扑萤就安静地拿着树枝在泥土上画画，画上有你，还有她。', '');
+    player.luck = (Number(player.luck) || 0) + 2;
+    growth.luck += 1;
+    intel('你的定力 +2，夏扑萤定力 +1，羁绊 +5。', 'good');
   } else {
     return false;
   }
 
   player.bondXiaPuying = getBondValue() + bondGain;
+  updateAttrUI();
+  updateNeiLiDisplays();
   renderBondPanel();
   saveGame();
   return true;
@@ -2459,9 +2577,9 @@ function updateAttrUI() {
 
 /* 武功/技艺卡片 UI 见 skillcards.js */
 /* 离线收益系统见 offline.js */
-function saveGame() {
-  if (!player.surname) return;
-  const data = {
+function buildSavePayload() {
+  if (!player.surname) return null;
+  return {
     player: player,
     battleStage: battle.stage,
     storyFinished: storyFinished,
@@ -2476,10 +2594,19 @@ function saveGame() {
       cookingActive: !!cookingState.running,
       cookingRecipe: cookingState.recipe,
       cookingPending: cookingState.running
-        ? (cookingState.pending || []).map(it => ({ fishId: it.fishId, weight: Number(it.weight) || 0 }))
+        ? (cookingState.pending || []).map(it => ({
+            fishId: it.fishId,
+            weight: Number(it.weight) || 0,
+            fishQuality: it.fishQuality != null && Number.isFinite(Number(it.fishQuality)) ? Number(it.fishQuality) : null
+          }))
         : []
     }
   };
+}
+
+function saveGame() {
+  const data = buildSavePayload();
+  if (!data) return;
   try {
     localStorage.setItem('wuxia_save_v1', JSON.stringify(data));
   } catch (err) {}
@@ -2607,6 +2734,7 @@ function loadGame() {
     battle.dreamId = '';
     battle.storyBattleId = '';
     battle.whiteRobe = null;
+    battle.lastWeirdPoisonAt = 0;
     player.maxHp = getMaxHp();
     player.hp = player.maxHp;
 
@@ -2657,7 +2785,7 @@ function loadGame() {
       }
     }
 
-    if (storyFlags.leftVillage) {
+    if (storyFlags.leftVillage && !storyFlags.arrivedCapital) {
       if (typeof cancelFishing === 'function') cancelFishing();
       if (player.trainingActivity && player.trainingActivity !== 'internal') {
         player.trainingActivity = '';
@@ -2675,6 +2803,7 @@ function loadGame() {
     updateBuSuzhikeNpc();
     updatePeiWenxiuHomeNpc();
     updateDepartBtn();
+    updateArriveBtn();
     renderBag();
     renderBondPanel();
     return true;
@@ -2758,6 +2887,7 @@ function resetGame() {
     storyFlags.peiPostTalkDone = false;
     storyFlags.departUnlocked = false;
     storyFlags.leftVillage = false;
+    storyFlags.arrivedCapital = false;
     storyFlags.farewellTiezhu = false;
     storyFlags.farewellShip = false;
     storyFlags.farewellDaifu = false;
@@ -2769,6 +2899,7 @@ function resetGame() {
     storyFlags.carriagePeiLotusBond = false;
     pendingLuoyingHint = false;
     closeDepartModal();
+    closeArriveModal();
     player.bondXiaPuying = 50;
     player.bondPeiWenxiu = 0;
     player.companionId = BOND_SPAR_ID;
@@ -2809,6 +2940,7 @@ function resetGame() {
     updateBuSuzhikeNpc();
     updatePeiWenxiuHomeNpc();
     updateDepartBtn();
+    updateArriveBtn();
     renderBag();
 
     intelLogs = [];
@@ -2822,7 +2954,8 @@ function resetGame() {
     battle.forfeited = false;
     battle.sparNpcId = '';
     battle.dreamId = '';
-    battle.over = false;
+    battle.whiteRobe = null;
+    battle.lastWeirdPoisonAt = 0;
 
     $('gameScreen').classList.remove('active');
     $('createScreen').classList.add('active');
@@ -2831,6 +2964,290 @@ function resetGame() {
 
 $('resetBtn').addEventListener('click', resetGame);
 window.addEventListener('beforeunload', saveGame);
+
+/* ================= 存档导出与导入 ================= */
+let pendingImportSaveData = null;
+
+function decodeSaveText(raw) {
+  const trimmed = String(raw == null ? '' : raw).trim();
+  if (!trimmed) return null;
+  let parsed = null;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch (e) {
+    try {
+      const bin = atob(trimmed.replace(/\s+/g, ''));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const jsonStr = new TextDecoder().decode(bytes);
+      parsed = JSON.parse(jsonStr);
+    } catch (e2) {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+  if (!parsed.player || typeof parsed.player !== 'object') return null;
+  if (typeof parsed.player.surname !== 'string' || !parsed.player.surname.trim()) return null;
+  return parsed;
+}
+
+function exportSaveFile() {
+  const payload = buildSavePayload();
+  if (!payload) {
+    showToast('当前暂无角色存档可导出');
+    return;
+  }
+  const text = JSON.stringify(payload, null, 2);
+  const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const fullName = (player.surname || '') + (player.givenName || '');
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `wuxia_save_${fullName || 'backup'}_${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast('存档文件已导出');
+}
+
+function openSaveTransferModal() {
+  const modal = $('saveTransferModal');
+  if (!modal) return;
+  const textarea = $('saveTransferText');
+  if (textarea) {
+    const payload = buildSavePayload();
+    textarea.value = payload ? JSON.stringify(payload) : '';
+  }
+  modal.classList.add('show');
+}
+
+function closeSaveTransferModal() {
+  const modal = $('saveTransferModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function copySaveTextFromModal() {
+  const textarea = $('saveTransferText');
+  const payload = buildSavePayload();
+  if (!payload) {
+    showToast('当前暂无角色存档可导出');
+    return;
+  }
+  const text = JSON.stringify(payload);
+  if (textarea) {
+    textarea.value = text;
+    textarea.focus();
+    textarea.select();
+  }
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('存档文本已复制到剪贴板');
+    }).catch(() => {
+      try {
+        if (document.execCommand('copy')) showToast('存档文本已复制到剪贴板');
+        else showToast('已生成存档文本，请手动复制');
+      } catch (err) {
+        showToast('已生成存档文本，请手动复制');
+      }
+    });
+    return;
+  }
+  try {
+    if (document.execCommand('copy')) showToast('存档文本已复制到剪贴板');
+    else showToast('已生成存档文本，请手动复制');
+  } catch (err) {
+    showToast('已生成存档文本，请手动复制');
+  }
+}
+
+function openSaveImportConfirm(data) {
+  pendingImportSaveData = data;
+  const modal = $('saveImportConfirmModal');
+  if (!modal) {
+    applyImportedSave(data);
+    return;
+  }
+  const desc = $('saveImportConfirmDesc');
+  if (desc) {
+    const name = `${data.player.surname || ''}${data.player.givenName || ''}`.trim() || '未知侠客';
+    desc.textContent = `确认导入角色【${name}】的存档吗？导入后将直接覆盖当前角色进度。`;
+  }
+  modal.classList.add('show');
+}
+
+function closeSaveImportConfirm() {
+  pendingImportSaveData = null;
+  const modal = $('saveImportConfirmModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function requestImportSaveText(rawText) {
+  const parsed = decodeSaveText(rawText);
+  if (!parsed) {
+    showToast('存档内容无效或格式错误');
+    return false;
+  }
+  openSaveImportConfirm(parsed);
+  return true;
+}
+
+function applyImportedSave(data) {
+  if (!data || typeof data !== 'object' || !data.player || !data.player.surname) {
+    showToast('存档数据无效，导入失败');
+    return false;
+  }
+
+  pauseBattle();
+  stopBattleEngine();
+  battle.enemies = [];
+  battle.allies = [];
+  battle.over = false;
+  battle.forfeited = false;
+  battle.sparNpcId = '';
+  battle.dreamId = '';
+  battle.storyBattleId = '';
+  battle.whiteRobe = null;
+  battle.lastWeirdPoisonAt = 0;
+  battle.pozhan = 0;
+
+  if (typeof cancelFishing === 'function') cancelFishing();
+  else {
+    fishing.running = false;
+    fishing.nextStartAt = 0;
+    if (typeof resetFishingBtn === 'function') resetFishingBtn();
+  }
+
+  if (typeof cookingState !== 'undefined' && cookingState) {
+    cookingState.running = false;
+    cookingState.selected = {};
+    cookingState.pending = [];
+  }
+  const cookOv = $('cookingOverlay');
+  if (cookOv) cookOv.classList.remove('show');
+
+  if (dialogTimer) { clearInterval(dialogTimer); dialogTimer = null; }
+  dialogSkipFn = null;
+  waitClickActive = false;
+
+  ['bagModal', 'bondModal', 'departModal', 'arriveModal', 'strategyOverlay', 'bondBattleStrategyOverlay', 'studyOverlay', 'saveTransferModal', 'saveImportConfirmModal'].forEach(id => {
+    const el = $(id);
+    if (el) el.classList.remove('show');
+  });
+
+  Object.keys(storyFlags).forEach(k => { storyFlags[k] = false; });
+  pendingLuoyingHint = false;
+  intelLogs = [];
+
+  const copyPayload = Object.assign({}, data, { lastActiveAt: Date.now() });
+  try {
+    localStorage.setItem('wuxia_save_v1', JSON.stringify(copyPayload));
+  } catch (err) {
+    showToast('写入本地存储失败');
+    return false;
+  }
+
+  if (!loadGame()) {
+    showToast('存档解析失败，未能导入');
+    return false;
+  }
+
+  pendingOffline = null;
+  if (typeof resetOfflineClock === 'function') resetOfflineClock();
+  const impClk = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+  lastStudyTickAt = impClk;
+  lastBondNeiLiTime = impClk;
+  if (typeof lastNeiLiTime !== 'undefined') lastNeiLiTime = impClk;
+  if (typeof lastTrainingClockMs !== 'undefined') lastTrainingClockMs = 0;
+
+  mainView = storyFinished ? 'village' : 'story';
+  $('createScreen').classList.remove('active');
+  $('gameScreen').classList.add('active');
+
+  updateAttrUI();
+  renderSkills();
+  renderTechniques();
+  if (typeof renderCombatTechniques === 'function') renderCombatTechniques();
+  renderBag();
+  renderBondPanel();
+  if (typeof renderDreamPanel === 'function') renderDreamPanel();
+  renderSettings();
+  renderBattleIdle();
+  updateTrainingUI();
+  updateNeiLiDisplays();
+  if (typeof updateOfflineBonusUI === 'function') updateOfflineBonusUI();
+  switchTab('settings');
+  saveGame();
+  showToast('存档导入成功');
+  return true;
+}
+
+const exportSaveFileBtnEl = $('exportSaveFileBtn');
+if (exportSaveFileBtnEl) {
+  exportSaveFileBtnEl.addEventListener('click', exportSaveFile);
+}
+const importSaveFileBtnEl = $('importSaveFileBtn');
+const importSaveFileInputEl = $('importSaveFileInput');
+if (importSaveFileBtnEl && importSaveFileInputEl) {
+  importSaveFileBtnEl.addEventListener('click', () => {
+    importSaveFileInputEl.value = '';
+    importSaveFileInputEl.click();
+  });
+  importSaveFileInputEl.addEventListener('change', () => {
+    const file = importSaveFileInputEl.files && importSaveFileInputEl.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => requestImportSaveText(String(reader.result || ''));
+    reader.onerror = () => showToast('读取存档文件失败');
+    reader.readAsText(file, 'utf-8');
+  });
+}
+const openSaveTextModalBtnEl = $('openSaveTextModalBtn');
+if (openSaveTextModalBtnEl) {
+  openSaveTextModalBtnEl.addEventListener('click', openSaveTransferModal);
+}
+const copySaveTextBtnEl = $('copySaveTextBtn');
+if (copySaveTextBtnEl) {
+  copySaveTextBtnEl.addEventListener('click', copySaveTextFromModal);
+}
+const applySaveTextBtnEl = $('applySaveTextBtn');
+if (applySaveTextBtnEl) {
+  applySaveTextBtnEl.addEventListener('click', () => {
+    const textarea = $('saveTransferText');
+    requestImportSaveText(textarea ? textarea.value : '');
+  });
+}
+const closeSaveTextModalBtnEl = $('closeSaveTextModalBtn');
+if (closeSaveTextModalBtnEl) {
+  closeSaveTextModalBtnEl.addEventListener('click', closeSaveTransferModal);
+}
+const saveTransferModalEl = $('saveTransferModal');
+if (saveTransferModalEl) {
+  saveTransferModalEl.addEventListener('click', e => {
+    if (e.target === saveTransferModalEl) closeSaveTransferModal();
+  });
+}
+const saveImportConfirmBtnEl = $('saveImportConfirmBtn');
+if (saveImportConfirmBtnEl) {
+  saveImportConfirmBtnEl.addEventListener('click', () => {
+    const data = pendingImportSaveData;
+    closeSaveImportConfirm();
+    if (data) applyImportedSave(data);
+  });
+}
+const saveImportCancelBtnEl = $('saveImportCancelBtn');
+if (saveImportCancelBtnEl) {
+  saveImportCancelBtnEl.addEventListener('click', closeSaveImportConfirm);
+}
+const saveImportConfirmModalEl = $('saveImportConfirmModal');
+if (saveImportConfirmModalEl) {
+  saveImportConfirmModalEl.addEventListener('click', e => {
+    if (e.target === saveImportConfirmModalEl) closeSaveImportConfirm();
+  });
+}
 
 function applyFontSettings(save = false) {
   const size = Number($('fontSize').value || 1.1);
@@ -2948,6 +3365,7 @@ $('battleLeaveBtn').addEventListener('click', () => {
   battle.dreamId = '';
   battle.storyBattleId = '';
   battle.whiteRobe = null;
+  battle.lastWeirdPoisonAt = 0;
   battle.pozhan = 0;
   const forfeitBtn = $('battleForfeitBtn');
   if (forfeitBtn) { forfeitBtn.style.display = 'none'; forfeitBtn.textContent = '放 弃 战 斗'; }
@@ -3002,6 +3420,7 @@ $('startBtn').addEventListener('click', () => {
   storyFlags.peiPostTalkDone = false;
   storyFlags.departUnlocked = false;
   storyFlags.leftVillage = false;
+  storyFlags.arrivedCapital = false;
   storyFlags.farewellTiezhu = false;
   storyFlags.farewellShip = false;
   storyFlags.farewellDaifu = false;
@@ -3055,6 +3474,7 @@ $('startBtn').addEventListener('click', () => {
   player.bondPeiWenxiu = 0;
   player.companionId = BOND_SPAR_ID;
   player.bond = { neiLi: 0, levels: { qingyuan: 9, feishipo: 7, tanafa: 7 }, lastCultAt: Date.now(), lastGrowthAt: Date.now() };
+  player.strategy = defaultStrategy();
   player.bondStrategy = defaultStrategy();
   player.speed = 0.15;
   initSkills();
@@ -3084,6 +3504,7 @@ $('startBtn').addEventListener('click', () => {
   updateBuSuzhikeNpc();
   updatePeiWenxiuHomeNpc();
   updateDepartBtn();
+  updateArriveBtn();
   switchTab('main');
 });
 

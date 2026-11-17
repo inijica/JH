@@ -19,7 +19,7 @@ function restorePreBattleAction() {
   if (pre.trainingActivity && TRAINING_ACTIVITY[pre.trainingActivity]) {
     startTraining(pre.trainingActivity);
   }
-  if (pre.fishingActive && storyFlags.fishingUnlocked && !fishing.running) {
+  if (pre.fishingActive && (storyFlags.fishingUnlocked || storyFlags.arrivedCapital) && !fishing.running) {
     startFishing();
   }
 }
@@ -102,7 +102,6 @@ function handleSparWin(npcId) {
   }
 
   if (def.noGrowth) {
-    addLog(`${def.name} 并未因胜负而动气，功力如故。`, '');
     if (npcId === 'liQianyuan') {
       storyFlags.liQianyuanDefeated = true;
       addIntel('李先生神色复杂地看着你，似乎终于下定决心要说些什么。', 'good');
@@ -143,6 +142,7 @@ function makeSparEnemy(npcId) {
   if (!def) return null;
   const st = getNpcStats(npcId);
   const maxHp = Math.round(80 + st.con * 20);
+  const techSkills = Array.isArray(def.techniques) ? def.techniques : [];
   const enemy = {
     name: def.name,
     npcId,
@@ -164,7 +164,7 @@ function makeSparEnemy(npcId) {
     root: Number(def.root) || 0,
     comp: Number(def.comp) || 0,
     attack: def.attack,
-    skills: def.skills.map(sk => `${sk.name}（${levelToChinese(st.levels[sk.id])}重）`),
+    skills: def.skills.map(sk => `${sk.name}（${levelToChinese(st.levels[sk.id])}重）`).concat(techSkills),
     memory: {},
     confused: false,
     isSpar: true

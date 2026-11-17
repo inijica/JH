@@ -40,7 +40,7 @@ function getPerLayerMult(skill) {
   const raw = 1 + jwzz * 0.000001 + Math.pow(jwzz, 0.25) * 0.2;
   const capped = Math.min(raw, 101);
   if (skill && skill.type === '轻功') {
-    return 1 + (capped - 1) * 0.2;
+    return 1 + (capped - 1) * 0.7;
   }
   return capped;
 }
@@ -364,8 +364,8 @@ function getEnemyMaxMartial(enemy) {
   );
 }
 
-/* 【撼山势】每层附加体魄×0.05 的基础伤害，随倍率参与攻防计算；一百重翻倍 */
-const HANSHAN_CON_PER_LAYER = 0.05;
+/* 【撼山势】每层附加体魄×0.08 的基础伤害，随倍率参与攻防计算；一百重翻倍 */
+const HANSHAN_CON_PER_LAYER = 0.08;
 
 function calcHiddenDamage(multiplier, effectMultiplier, enemy) {
   const defMartial = getEnemyMaxMartial(enemy); // 改为取敌方最高武学
@@ -388,7 +388,7 @@ function calcNormalDamage(effectMultiplier) {
 const QIANGSHEN_UNLOCKS = [
   { level: 5,   desc: '额外提升 1 根骨' },
   { level: 10,  desc: '额外提升 10 体魄，每秒气血恢复 +10' },
-  { level: 30,  desc: '额外提升 30 体魄，每秒气血恢复 +30' },
+  { level: 30,  desc: '额外提升 100 体魄，每秒气血恢复 +50' },
   { level: 50,  desc: '额外提升 1000 减伤，从五十重开始每重额外提升 2 体魄' },
   { level: 100, desc: '体魄提升 20%（独立乘区）' }
 ];
@@ -408,7 +408,7 @@ function getQiangshenConBonus(level) {
   const mult = getPerLayerMult(getMartialSkillById('qiangshen'));
   let bonus = 2 + level * 2 * mult;
   if (level >= 10) bonus += 10;
-  if (level >= 30) bonus += 30;
+  if (level >= 30) bonus += 100;
   if (level > 50) bonus += (level - 50) * 2 * mult;
   return bonus;
 }
@@ -425,7 +425,7 @@ function getHpRegen() {
   const level = getQiangshenLevel();
   let regen = Number(player.bonusHpRegen) || 0;
   if (level >= 10) regen += 10;
-  if (level >= 30) regen += 30;
+  if (level >= 30) regen += 50;
   return regen;
 }
 
@@ -470,14 +470,29 @@ function getAccuracyRate() {
 }
 
 function getEvasionRate() {
-  let rate = 0.05 + getQingyuanLevel() * 0.01 * getPerLayerMult(getMartialSkillById('qingyuan'));
+  let rate = 0.10 + getQingyuanLevel() * 0.01 * getPerLayerMult(getMartialSkillById('qingyuan'));
   if (getQingyuanLevel() >= 25) rate += 0.1;
-  return Math.max(0, Math.min(1, rate));
+  return Math.max(0, rate);
 }
 function hasQingyuanTrait() { return getQingyuanLevel() >= 100; }
 
+function calcHitChance(accuracy, evasion) {
+  const H = Math.max(0, Number(accuracy) || 0) * 100;
+  const E = Math.max(0, Number(evasion) || 0) * 100;
+  const rPrime = (H + 100) / (E + 100);
+  if (rPrime <= 0.5) return 0;
+  if (rPrime >= 2) return 1;
+  return Math.pow((rPrime - 0.5) / 1.5, 0.8);
+}
+
+function calcAccuracyOverflow(accuracy, evasion) {
+  const acc = Math.max(0, Number(accuracy) || 0);
+  const eva = Math.max(0, Number(evasion) || 0);
+  return Math.max(0, acc - (2 * eva + 1));
+}
+
 function rollDodge(accuracy, evasion) {
-  const hitChance = Math.max(0, Math.min(1, (Number(accuracy) || 0) - (Number(evasion) || 0)));
+  const hitChance = calcHitChance(accuracy, evasion);
   return Math.random() >= hitChance;
 }
 

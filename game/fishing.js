@@ -7,19 +7,32 @@ const fishing = {
   timerId: 0
 };
 
+function canFishHere() {
+  return !!(typeof storyFlags !== 'undefined' && (storyFlags.fishingUnlocked || storyFlags.arrivedCapital));
+}
+
+function getFishingBtnEntries() {
+  return [
+    { id: 'fishingBtn', label: '溪边垂钓' },
+    { id: 'capitalFishingBtn', label: '钓 鱼' }
+  ];
+}
+
 function resetFishingBtn() {
-  const btn = $('fishingBtn');
-  if (!btn) return;
-  btn.disabled = false;
-  btn.textContent = '溪边垂钓';
-  btn.style.backgroundImage = '';
-  btn.style.backgroundColor = '';
-  btn.style.color = '';
+  for (const entry of getFishingBtnEntries()) {
+    const btn = $(entry.id);
+    if (!btn) continue;
+    btn.disabled = false;
+    btn.textContent = entry.label;
+    btn.style.backgroundImage = '';
+    btn.style.backgroundColor = '';
+    btn.style.color = '';
+  }
 }
 
 function startFishing(plannedStartAt) {
   if (fishing.running) return;
-  if (!storyFlags.fishingUnlocked) return;
+  if (!canFishHere()) return;
   if (battleActive()) {
     showToast('战斗中无法垂钓');
     return;
@@ -33,8 +46,9 @@ function startFishing(plannedStartAt) {
     ? Number(plannedStartAt)
     : (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now());
 
-  const btn = $('fishingBtn');
-  if (btn) {
+  for (const entry of getFishingBtnEntries()) {
+    const btn = $(entry.id);
+    if (!btn) continue;
     btn.disabled = true;
     btn.textContent = '垂钓中...';
     btn.style.backgroundColor = '#30483d';
@@ -45,9 +59,11 @@ function startFishing(plannedStartAt) {
 }
 
 function renderFishingProgress(pct) {
-  const btn = $('fishingBtn');
-  if (!btn) return;
-  btn.style.backgroundImage = `linear-gradient(to right, rgba(183,163,107,0.85) 0%, rgba(183,163,107,0.85) ${pct}%, transparent ${pct}%, transparent 100%)`;
+  for (const entry of getFishingBtnEntries()) {
+    const btn = $(entry.id);
+    if (!btn) continue;
+    btn.style.backgroundImage = `linear-gradient(to right, rgba(183,163,107,0.85) 0%, rgba(183,163,107,0.85) ${pct}%, transparent ${pct}%, transparent 100%)`;
+  }
 }
 
 function fishingLoop() {
@@ -74,7 +90,7 @@ function fishingLoop() {
     if (!fishing.nextStartAt || now < fishing.nextStartAt) return;
     const plannedStartAt = fishing.nextStartAt;
     fishing.nextStartAt = 0;
-    if (!storyFlags.fishingUnlocked) return;
+    if (!canFishHere()) return;
     if (battleActive()) return;
     startFishing(plannedStartAt);
   }
@@ -146,6 +162,9 @@ function rollFishingQuality() {
   return (rawQ + getFishingQualityFixed(L)) * getFishingQualityMultiplier(L);
 }
 
+const CAPITAL_COMMON_FISH = ['bailingyu', 'xishiban', 'hongwei', 'qingyu'];
+const FISHING_NON_FISH_IDS = ['wuxueXinde', 'wuxueGanwu', 'dahuanDan'];
+
 function rollFishingCatch() {
   const L = getFishingLevel();
   const Q = rollFishingQuality();
@@ -154,20 +173,34 @@ function rollFishingCatch() {
     return { type: 'empty', Q, message: '水面泛起涟漪，鱼儿却不上钩...' };
   }
 
+  const inCapital = !!(typeof storyFlags !== 'undefined' && storyFlags.arrivedCapital);
   const roll = Math.random();
   let category, itemId;
-  if (roll < 0.90) {
-    category = 'common';
-    const pick = Math.random();
-    if (pick < 1/3) itemId = 'jiyu';
-    else if (pick < 2/3) itemId = 'caoyu';
-    else itemId = 'baitiao';
-  } else if (roll < 0.99) {
-    category = 'rare';
-    itemId = 'chilinyu';
+  if (inCapital) {
+    if (roll < 0.95) {
+      category = 'common';
+      itemId = CAPITAL_COMMON_FISH[Math.floor(Math.random() * CAPITAL_COMMON_FISH.length)];
+    } else if (roll < 0.988) {
+      category = 'rare';
+      itemId = 'wuxueGanwu';
+    } else {
+      category = 'epic';
+      itemId = 'dahuanDan';
+    }
   } else {
-    category = 'epic';
-    itemId = 'wuxueXinde';
+    if (roll < 0.90) {
+      category = 'common';
+      const pick = Math.random();
+      if (pick < 1/3) itemId = 'jiyu';
+      else if (pick < 2/3) itemId = 'caoyu';
+      else itemId = 'baitiao';
+    } else if (roll < 0.99) {
+      category = 'rare';
+      itemId = 'chilinyu';
+    } else {
+      category = 'epic';
+      itemId = 'wuxueXinde';
+    }
   }
 
   const lucky = Math.random() < 0.001;
@@ -175,7 +208,7 @@ function rollFishingCatch() {
   const rewardCount = (dblChance > 0 && Math.random() < dblChance) ? 2 : 1;
   const result = { type: 'catch', Q, category, itemId, lucky, rewardCount };
 
-  if (itemId === 'wuxueXinde') {
+  if (FISHING_NON_FISH_IDS.includes(itemId)) {
     result.baseWeight = 1;
     result.weight = 1;
   } else {
@@ -193,23 +226,24 @@ function doFishingRoll() {
   if (roll.type === 'empty') return roll;
 
   const result = Object.assign({}, roll, { gains: [] });
-  if (roll.itemId === 'wuxueXinde') {
-    addItem('wuxueXinde', roll.rewardCount);
-    result.gains.push({ name: '武学心得', qty: roll.rewardCount });
+  if (FISHING_NON_FISH_IDS.includes(roll.itemId)) {
+    addItem(roll.itemId, roll.rewardCount);
+    result.gains.push({ name: ITEM_DEFS[roll.itemId].name, qty: roll.rewardCount });
   } else {
-    addItem(roll.itemId, roll.rewardCount, { weight: roll.weight });
-    result.gains.push({ name: ITEM_DEFS[roll.itemId].name, weight: roll.weight, qty: roll.rewardCount });
+    addItem(roll.itemId, roll.rewardCount, { weight: roll.weight, quality: roll.Q });
+    result.gains.push({ name: ITEM_DEFS[roll.itemId].name, weight: roll.weight, quality: roll.Q, qty: roll.rewardCount });
   }
 
   if (roll.lucky) {
-    addItem('wuxueXinde', roll.rewardCount);
-    result.gains.push({ name: '武学心得', fromLucky: true, qty: roll.rewardCount });
+    const luckyId = (typeof storyFlags !== 'undefined' && storyFlags.arrivedCapital) ? 'wuxueGanwu' : 'wuxueXinde';
+    addItem(luckyId, roll.rewardCount);
+    result.gains.push({ name: ITEM_DEFS[luckyId].name, fromLucky: true, qty: roll.rewardCount });
   }
 
   return result;
 }
 
-/* 品质对鱼重量的加成由 1 + Q*0.002 降为 1 + Q*0.001，削弱品质对最终效果的影响 */
+/* 品质对鱼重量的加成：1 + Q*0.0015 */
 function rollFishWeight(itemId, Q) {
   const base = FISH_BASE_WEIGHT[itemId];
   if (!base) return 0;
@@ -232,7 +266,10 @@ function showFishingResult(result, at) {
 
   const parts = result.gains.map(g => {
     const qty = g.qty > 1 ? ` ×${g.qty}` : '';
-    if (g.weight != null) return `${g.name} ${g.weight.toFixed(2)}s${qty}`;
+    if (g.weight != null) {
+      const qTxt = g.quality != null ? `（品质 ${Math.round(g.quality)}）` : '';
+      return `${g.name} ${g.weight.toFixed(2)}s${qTxt}${qty}`;
+    }
     return `${g.name}${qty}`;
   });
 

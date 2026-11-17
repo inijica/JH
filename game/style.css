@@ -100,6 +100,14 @@ h1{font-size:calc(20px * var(--font-scale, 1.1));font-weight:600;letter-spacing:
 .battle-log .log-line.event{color:var(--gold)}
 
 .settings-panel{width:520px;max-width:100%}.setting-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 0;border-bottom:1px dotted #d8d2c4}.setting-row>label,.setting-row strong{color:var(--jade-dark);font-size:15px}.setting-row select{max-width:65%;padding:9px 12px;border:1px solid var(--line);background:#fbfaf6;color:var(--ink);font:inherit;border-radius:2px}.setting-size input{flex:1;min-width:80px;accent-color:var(--jade)}#fontSizeValue{min-width:48px;text-align:right;color:var(--jade-dark);font-weight:600}.setting-hint,.setting-reset p{font-size:12px;color:var(--muted);line-height:1.7;margin-top:8px}.setting-reset button{padding:9px 14px;border:1px solid #c9a9a0;background:#f7ece8;color:var(--vermilion);font:inherit;cursor:pointer;border-radius:2px;white-space:nowrap}.setting-reset button:hover{background:#f0e0db}
+.setting-save-transfer{align-items:flex-start;flex-direction:column}
+.setting-save-transfer .setting-hint{margin-top:4px}
+.save-transfer-actions{display:flex;flex-wrap:wrap;gap:8px;width:100%}
+.save-transfer-actions button{flex:1 1 auto;padding:8px 12px;border:1px solid var(--jade);background:rgba(255,255,255,.76);color:var(--jade-dark);font:inherit;font-size:13px;border-radius:2px;cursor:pointer;white-space:nowrap;transition:all .18s}
+.save-transfer-actions button:hover{background:var(--jade-dark);color:#f8f5eb}
+.save-transfer-modal-box{width:480px}
+.save-transfer-textarea{width:100%;min-height:150px;padding:10px;border:1px solid var(--line);border-radius:2px;background:#fbfaf6;color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;resize:vertical;margin-bottom:12px;outline:none}
+.save-transfer-textarea:focus{border-color:var(--jade)}
 
 @media(max-width:760px){body{padding:12px}.topbar{gap:6px}.topbar button{padding:9px 12px}.tab-content{gap:8px}.left-col{width:190px}.skill-columns{gap:8px}.skill-col{padding:9px}}
 @media(max-width:560px){body{padding:8px}.create-box{width:100%;padding:24px 18px}.tab-content{flex-wrap:wrap}.left-col{width:100%;flex-direction:row;align-items:stretch}.left-col>.panel{flex:1;min-width:0}#storyView,#villageView,#dialogView{flex:1 1 100%;width:100%}.skill-columns{flex-wrap:wrap}.skill-col{flex:1 1 calc(50% - 8px)}.battle-arena{gap:8px}.fighter{padding:11px}.topbar button{font-size:calc(12px * var(--font-scale, 1.1));padding:9px 10px;letter-spacing:1px}.dialog-options{gap:8px}.dialog-opt{flex:1 1 100%;min-width:0}.dialog-scene{min-height:320px}}

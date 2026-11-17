@@ -19,9 +19,9 @@ const DREAM_DOG_STATS = {
   hidden: 0,
   medicine: 0,
   accuracy: 1.1,
-  evasion: 0.2,
+  evasion: 0.3,
   attackName: '咬你',
-  attackMultiplier: 0.65,
+  attackMultiplier: 0.5,
   attackHits: 1
 };
 
@@ -115,6 +115,7 @@ function makeDreamNpcEnemy(npcId) {
   const E = DREAM_THREE_HEROES_EXTRA;
   const con = st.con * M;
   const maxHp = Math.round(80 + con * 20);
+  const techSkills = Array.isArray(def.techniques) ? def.techniques : [];
   const enemy = {
     name: def.name,
     npcId,
@@ -132,12 +133,12 @@ function makeDreamNpcEnemy(npcId) {
     hidden: st.hidden * M,
     medicine: st.medicine * M,
     accuracy: (Number(def.accuracy) || 0) + E.accuracy,
-    evasion: Math.min(1, (Number(def.evasion) || 0) + E.evasion),
+    evasion: Math.max(0, (Number(def.evasion) || 0) + E.evasion),
     root: (Number(def.root) || 0) * M + E.mianmian * 2,
     comp: (Number(def.comp) || 0) * M + E.xushi * 2,
     luck: (Number(def.luck) || 0) * M + E.shenning * 2,
     attack: def.attack,
-    skills: def.skills.map(sk => `${sk.name}（${levelToChinese(st.levels[sk.id])}重）`),
+    skills: def.skills.map(sk => `${sk.name}（${levelToChinese(st.levels[sk.id])}重）`).concat(techSkills),
     memory: {},
     confused: false,
     isSpar: true,
@@ -152,6 +153,63 @@ function makeDreamNpcEnemy(npcId) {
     enemy.huomaiSpeedPerLayer = 0;
   }
   return enemy;
+}
+
+function makeGiantWhiteRobeEnemy() {
+  const base = typeof makeWhiteRobeEnemy === 'function' ? makeWhiteRobeEnemy(0) : null;
+  const s = DREAM_DOG_STATS;
+  const bCon = base ? Number(base.con) : s.con * 1.2;
+  const bNeiLi = base ? Number(base.neiLi) : s.neiLi * 1.2;
+  const bRoot = base ? Number(base.root) : s.root * 1.2;
+  const bComp = base ? Number(base.comp) : s.comp * 1.2;
+  const bLuck = base ? Number(base.luck) : s.luck * 1.2;
+  const bSpeed = base ? Number(base.speed) : s.speed * 1.2;
+  const bFist = base ? Number(base.fist) : s.fist * 1.2;
+  const bBlade = base ? Number(base.blade) : s.blade * 1.2;
+  const bSword = base ? Number(base.sword) : s.sword * 1.2;
+  const bChangbing = base ? Number(base.changbing) : s.changbing * 1.2;
+  const bQimen = base ? Number(base.qimen) : s.qimen * 1.2;
+  const bHidden = base ? Number(base.hidden) : s.hidden * 1.2;
+  const bMed = base ? Number(base.medicine) : s.medicine * 1.2;
+  const bAcc = base ? Number(base.accuracy) : s.accuracy * 1.2;
+  const bEva = base ? Number(base.evasion) : s.evasion * 1.2;
+  const bAtk = base && base.attack
+    ? Object.assign({}, base.attack)
+    : { name: '白衣鬼爪', multiplier: s.attackMultiplier, hits: s.attackHits, stat: 'fist', bleed: true };
+
+  const M = 5;
+  const con = bCon * M;
+  const maxHp = Math.round(80 + con * 20);
+  return {
+    name: '超大型白衣怪人',
+    npcId: 'giantWhiteRobe',
+    hp: maxHp,
+    maxHp,
+    atk: 0,
+    speed: Math.max(0.05, bSpeed * M - 0.1),
+    con,
+    neiLi: bNeiLi * M,
+    root: bRoot * M,
+    comp: bComp * M,
+    luck: bLuck * M,
+    fist: bFist * M,
+    blade: bBlade * M,
+    sword: bSword * M,
+    changbing: bChangbing * M,
+    qimen: bQimen * M,
+    hidden: bHidden * M,
+    medicine: bMed * M,
+    accuracy: bAcc * 1.5,
+    evasion: bEva * 1.5,
+    attack: bAtk,
+    skills: ['白衣鬼爪'],
+    memory: {},
+    confused: false,
+    isSpar: true,
+    dreamEnemy: true,
+    isGiantWhiteRobe: true,
+    weirdPoisonHeal: true
+  };
 }
 
 /* 挑战数据：新增挑战时照着这里的结构补充即可
@@ -215,10 +273,34 @@ const DREAM_CHALLENGES = [
     buildEnemies() {
       return ['zhaoTiezhu', 'zhaoShip', 'zhaoDaifu'].map(makeDreamNpcEnemy).filter(Boolean);
     }
+  },
+  {
+    id: 'giantWhiteRobe',
+    name: '合体！超巨大白衣怪人！',
+    unlocked: () => !!(typeof storyFlags !== 'undefined' && storyFlags.peiStoryDone),
+    tagline: '七名白衣怪人忽然齐声怪叫着撞作一团，转眼化作一道遮天蔽日的巨大白影。',
+    lead: '白衣怪人莫名其妙地合体变成了一个超大型的白衣怪人.......',
+    enemies: ['超大型白衣怪人'],
+    mechanics: [
+      '超大型白衣怪人属性为白衣怪人 ×5，命中率 ×1.5，闪避率 ×1.5，行动速度 -0.1；招式与白衣怪人相同。',
+      '每秒给在场所有人（包括自己）叠加一层【诡异毒素】：每层每秒失去 1 点气血；作用在超大型白衣怪人身上时转变为每秒回复等量气血。'
+    ],
+    notes: [
+      '陪伴角色会与你一同入梦参战。'
+    ],
+    rewards: [],
+    buildEnemies() {
+      return [makeGiantWhiteRobeEnemy()];
+    }
   }
 ];
 
 let dreamSelectedId = '';
+
+function isDreamChallengeUnlocked(def) {
+  if (!def) return false;
+  return typeof def.unlocked === 'function' ? !!def.unlocked() : !!def.unlocked;
+}
 
 function getDreamChallenge(id) {
   return DREAM_CHALLENGES.find(c => c && c.id === id) || null;
@@ -263,12 +345,12 @@ function renderDreamPanel() {
   const listEl = $('dreamList');
   if (!listEl) return;
 
-  const unlocked = DREAM_CHALLENGES.filter(c => c && c.unlocked);
+  const unlocked = DREAM_CHALLENGES.filter(isDreamChallengeUnlocked);
   if (!unlocked.length) {
     listEl.innerHTML = '<div class="dream-empty">暂无入梦挑战</div>';
     return;
   }
-  if (!getDreamChallenge(dreamSelectedId) || !getDreamChallenge(dreamSelectedId).unlocked) {
+  if (!isDreamChallengeUnlocked(getDreamChallenge(dreamSelectedId))) {
     dreamSelectedId = unlocked[0].id;
   }
 
@@ -299,7 +381,7 @@ function renderDreamPanel() {
     const rewardText = getDreamRewardText(def);
     rewardEl.innerHTML = [
       `<div class="dream-reward-line">${escapeHtml(rewardText || '无')}</div>`,
-      `<div class="dream-reward-note">${cleared ? '奖励已获得（重复挑战不再发放）' : '首次通关时获得以上奖励，且只能获得一次。'}</div>`
+      `<div class="dream-reward-note">${rewardText ? (cleared ? '奖励已获得（重复挑战不再发放）' : '首次通关时获得以上奖励，且只能获得一次。') : '暂无通关奖励，可随时入梦切磋试炼。'}</div>`
     ].join('');
   }
 
@@ -313,7 +395,7 @@ function renderDreamPanel() {
 /* 入梦挑战：进入战斗（夏扑萤随行参战） */
 function startDreamBattle(challengeId) {
   const def = getDreamChallenge(challengeId);
-  if (!def) return;
+  if (!def || !isDreamChallengeUnlocked(def)) return;
   if (!player.surname) {
     showToast('先踏入江湖再说吧');
     return;
@@ -340,6 +422,7 @@ function startDreamBattle(challengeId) {
   const dreamNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   battle.lastPozhanAt = dreamNow;
   battle.jiumaiNextAt = dreamNow + JIUMAI_DECAY_MS;
+  battle.lastWeirdPoisonAt = dreamNow;
   battle.sparNpcId = '';
   battle.dreamId = def.id;
   battle.storyBattleId = '';
@@ -379,11 +462,16 @@ function handleDreamWin(dreamId) {
       try { r.apply(); } catch (err) {}
     });
     const rewardText = getDreamRewardText(def);
-    addLog(`【入梦】破去${def.name}！获得奖励：${rewardText}。`, 'crit');
-    addIntel(`你在入梦中破去${def.name}，获得奖励：${rewardText}。`, 'gold');
+    if (rewardText) {
+      addLog(`【入梦】破去${def.name}！获得奖励：${rewardText}。`, 'crit');
+      addIntel(`你在入梦中破去${def.name}，获得奖励：${rewardText}。`, 'gold');
+    } else {
+      addLog(`【入梦】破去${def.name}！`, 'crit');
+      addIntel(`你在入梦中破去${def.name}。`, 'gold');
+    }
     showToast(`入梦挑战「${def.name}」通关！`);
   } else if (def) {
-    addLog(`【入梦】${def.name}再破，奖励此前已得，此番并无新的所得。`, '');
+    addLog(`【入梦】${def.name}再破，并无新的所得。`, '');
   }
 
   player.maxHp = getMaxHp();
@@ -429,7 +517,7 @@ function dreamChainAttackAfter(actor) {
   const startEl = $('dreamStartBtn');
   if (startEl) {
     startEl.addEventListener('click', () => {
-      if (!dreamSelectedId) dreamSelectedId = (DREAM_CHALLENGES.find(c => c && c.unlocked) || {}).id || '';
+      if (!dreamSelectedId) dreamSelectedId = (DREAM_CHALLENGES.find(isDreamChallengeUnlocked) || {}).id || '';
       if (dreamSelectedId) startDreamBattle(dreamSelectedId);
     });
   }

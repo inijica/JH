@@ -214,9 +214,37 @@
                 <div class="npc-row">
                   <div class="npc-box npc-puying" id="npcXiaPuyingCarriage" data-tip="正兴致勃勃地看着窗外的风景">夏 扑 萤</div>
                   <div class="npc-box npc-mystery" id="npcPeiWenxiuCarriage" data-tip="此行的引路人，正闭目养神">裴 文 秀</div>
+                  <button type="button" id="arriveBtn" class="event">抵 达</button>
                 </div>
                 <div class="training-actions">
                   <button type="button" id="trainInternalCarriageBtn">打坐入定</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="capitalMap" class="village-view" style="display:none">
+            <div class="village-head">
+              <div class="village-name">京 城</div>
+              <div class="village-intro">天子脚下，朱雀长街车水马龙，市井繁华却又暗流涌动。你们暂居于城中一隅，各自准备着接下来的风波。</div>
+            </div>
+            <div class="place-list">
+              <div class="place-card">
+                <div class="place-name">住 处</div>
+                <div class="place-desc">裴文秀寻得的一处清净小宅，青砖灰瓦掩在深巷尽头，院里栽着一株老槐树，院角还砌了一方小小的练功场。</div>
+                <div class="training-actions">
+                  <button type="button" id="trainCapitalInternalBtn">打坐入定</button>
+                  <button type="button" id="trainStoneLockBtn">石锁锤炼</button>
+                  <button type="button" id="trainWaterPlumBtn">水上梅桩</button>
+                  <button type="button" id="trainSparPracticeBtn">招式对练</button>
+                  <button type="button" id="capitalCookBtn">烹 饪</button>
+                </div>
+              </div>
+              <div class="place-card">
+                <div class="place-name">城 外</div>
+                <div class="place-desc">出城数里便是城郊官道旁的清溪，垂柳依依，流水潺潺，游鱼不时跃出水面。</div>
+                <div class="training-actions">
+                  <button type="button" id="capitalFishingBtn">钓 鱼</button>
                 </div>
               </div>
             </div>
@@ -264,10 +292,10 @@
           <div class="stat-line"><span class="name">内力增速</span><b id="a-neili-rate">0/分钟</b></div>
           <div class="stat-line"><span class="name">内力增伤</span><b id="a-neili-dmg">0</b></div>
           <div class="stat-line"><span class="name">内力减伤</span><b id="a-neili-dr">0</b></div>
-          <div class="stat-line"><span class="name tooltip" data-tip="攻击命中判定：最终命中率 = 命中率 - 敌人闪避率">命中率</span><b id="a-hit">90%</b></div>
-          <div class="stat-line"><span class="name tooltip" data-tip="敌方攻击时进行闪避判定：最终命中率 = 敌人命中率 - 闪避率">闪避率</span><b id="a-evade">5%</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="攻击命中判定：根据攻方命中值 H 与守方闪避值 E 计算修正比值 r' = (H+100)/(E+100)，r'≤0.5 必闪，r'≥2 必中，其间按 ((r'-0.5)/1.5)^0.8 计算命中率">命中率</span><b id="a-hit">90%</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="敌方攻击时进行闪避判定：根据敌方命中值 H 与我方闪避值 E 计算修正比值 r' = (H+100)/(E+100)，E≥2H+100 时必定闪避">闪避率</span><b id="a-evade">10%</b></div>
           <div class="stat-line"><span class="name tooltip" data-tip="触发几率 =（我方延绵不绝 - 敌方根骨×0.5/2）%：触发后额外进行一次相同的行动，这次行动的效果只有原本的30%">延绵不绝</span><b id="a-combo">0%</b></div>
-          <div class="stat-line"><span class="name tooltip" data-tip="触发几率 =（我方虚实莫测 - 敌方悟性×0.5/2）%：触发后本次攻击命中率提升50%，溢出的命中转化为增伤">虚实莫测</span><b id="a-crit">0%</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="触发几率 =（我方虚实莫测 - 敌方悟性×0.5/2）%：触发后本次攻击命中率提升50%，超过必中线的溢出命中转化为增伤">虚实莫测</span><b id="a-crit">0%</b></div>
           <div class="stat-line"><span class="name tooltip" data-tip="触发几率 =（我方神宁气静 - 敌方定力×0.5/2）%：触发后闪避率提升30%，额外进行一次闪避判定（取成功的一次，两次皆失败则判定为命中）">神宁气静</span><b id="a-shenning">0%</b></div>
           <div class="stat-line"><span class="name">行动速度</span><b id="a-speed">0.15</b></div>
           <div class="stat-line"><span class="name">夏扑萤羁绊</span><b id="a-bond">0</b></div>
@@ -369,6 +397,18 @@
             <b id="offlineBonusSettingVal">0 秒</b>
           </div>
           <div class="attr-subtitle">存 档 管 理</div>
+          <div class="setting-row setting-save-transfer">
+            <div>
+              <strong>存档导出 / 导入</strong>
+              <p class="setting-hint">支持导出或导入 .json 存档文件，也可通过文本复制粘贴跨设备备份恢复。</p>
+            </div>
+            <div class="save-transfer-actions">
+              <button id="exportSaveFileBtn" type="button">导出存档文件</button>
+              <button id="importSaveFileBtn" type="button">导入存档文件</button>
+              <button id="openSaveTextModalBtn" type="button">文本导出 / 导入</button>
+              <input id="importSaveFileInput" type="file" accept=".json,.txt,application/json,text/plain" style="display:none">
+            </div>
+          </div>
           <div class="setting-row setting-reset">
             <div><strong>重新开始</strong><p>删除当前角色进度，并重新创建角色。</p></div>
             <button id="resetBtn" type="button">重新开始</button>
@@ -513,6 +553,41 @@
     </div>
   </div>
 
+  <div id="arriveModal" class="bag-modal">
+    <div class="bag-modal-box">
+      <div class="bag-modal-title">抵 达 京 城</div>
+      <div class="bag-modal-desc">即将抵达京城，下车后将进入京城并离开马车。确定抵达吗？</div>
+      <div class="bag-modal-actions">
+        <button type="button" id="arriveConfirmBtn">确定</button>
+        <button type="button" id="arriveCancelBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="saveTransferModal" class="bag-modal">
+    <div class="bag-modal-box save-transfer-modal-box">
+      <div class="bag-modal-title">存 档 文 本 备 份</div>
+      <div class="bag-modal-desc">可复制下方存档文本保存，或清空后粘贴他处备份的存档文本再点击导入。</div>
+      <textarea id="saveTransferText" class="save-transfer-textarea" placeholder="在此粘贴存档 JSON 或 Base64 文本..."></textarea>
+      <div class="bag-modal-actions">
+        <button type="button" id="copySaveTextBtn">导出并复制</button>
+        <button type="button" id="applySaveTextBtn">导入此存档</button>
+        <button type="button" id="closeSaveTextModalBtn">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="saveImportConfirmModal" class="bag-modal">
+    <div class="bag-modal-box">
+      <div class="bag-modal-title">确 认 导 入 存 档</div>
+      <div class="bag-modal-desc" id="saveImportConfirmDesc">确认导入此存档吗？导入后将直接覆盖当前角色进度。</div>
+      <div class="bag-modal-actions">
+        <button type="button" id="saveImportConfirmBtn">确认导入</button>
+        <button type="button" id="saveImportCancelBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
   <div id="cookingOverlay" class="cooking-overlay">
     <div class="cooking-box">
       <div class="cooking-head">
@@ -552,13 +627,19 @@
           <input type="checkbox" id="strategyEnable">
           <span>启用战斗策略（关闭时按默认招式战斗）</span>
         </label>
-        <div class="strategy-hint">按回合顺序循环使用技能或特技。循环次数 -1 表示无限；设为 1 则从第二次循环开始跳过该技能。未选择技能的回合会被跳过。气血低于阈值时优先使用指定技能或特技，且不消耗回合策略。</div>
+        <div class="strategy-hint">按回合顺序循环使用技能或特技。循环次数 -1 表示无限；设为 1 则从第二次循环开始跳过该技能。未选择技能的回合会被跳过。触发优先级：自身低血线优先 → 同伴低血线次之 → 回合循环技能（触发低血线策略不消耗回合策略）。</div>
         <div class="strategy-rounds" id="strategyRounds"></div>
         <div class="strategy-lowhp">
-          <span>气血低于</span>
+          <span>自身气血低于</span>
           <input type="number" id="strategyLowHpPct" min="1" max="100" step="1" value="30">
           <span>% 时，立刻使用</span>
           <select id="strategyLowHpSkill"></select>
+        </div>
+        <div class="strategy-lowhp" style="margin-top:8px">
+          <span>有同伴血量低于</span>
+          <input type="number" id="strategyAllyLowHpPct" min="1" max="100" step="1" value="30">
+          <span>% 时，对其使用</span>
+          <select id="strategyAllyLowHpSkill"></select>
         </div>
       </div>
       <div class="strategy-foot">
@@ -578,13 +659,19 @@
           <input type="checkbox" id="bondBattleStrategyEnable">
           <span>启用羁绊角色战斗策略（关闭时按默认招式战斗）</span>
         </label>
-        <div class="strategy-hint">按回合顺序循环使用羁绊角色已学会的招式。循环次数 -1 表示无限；设为 1 则从第二次循环开始跳过该技能。未选择技能的回合会被跳过。气血低于阈值时优先使用指定技能，且不消耗回合策略。</div>
+        <div class="strategy-hint">按回合顺序循环使用羁绊角色已学会的招式。循环次数 -1 表示无限；设为 1 则从第二次循环开始跳过该技能。未选择技能的回合会被跳过。触发优先级：自身低血线优先 → 同伴低血线次之 → 回合循环技能（触发低血线策略不消耗回合策略）。</div>
         <div class="strategy-rounds" id="bondBattleStrategyRounds"></div>
         <div class="strategy-lowhp">
-          <span>气血低于</span>
+          <span>自身气血低于</span>
           <input type="number" id="bondBattleStrategyLowHpPct" min="1" max="100" step="1" value="30">
           <span>% 时，立刻使用</span>
           <select id="bondBattleStrategyLowHpSkill"></select>
+        </div>
+        <div class="strategy-lowhp" style="margin-top:8px">
+          <span>有同伴血量低于</span>
+          <input type="number" id="bondBattleStrategyAllyLowHpPct" min="1" max="100" step="1" value="30">
+          <span>% 时，对其使用</span>
+          <select id="bondBattleStrategyAllyLowHpSkill"></select>
         </div>
       </div>
       <div class="strategy-foot">

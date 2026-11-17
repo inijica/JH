@@ -68,13 +68,19 @@ function getBagItemDesc(slot) {
   if (slot.id === 'kaoyu' && slot.data) {
     const fishDef = ITEM_DEFS[slot.data.fishId];
     const eff = FISH_EFFECTS[slot.data.fishId];
-    const gain = (Number(slot.data.weight) || 0) * (eff ? eff.perWeight : 0) * (Number(slot.data.effectMult) || 1);
-    return `以${fishDef ? fishDef.name : '鱼'}烤制而成。食用后${eff ? eff.label : '属性'} +${gain.toFixed(4)}`;
+    const gain = typeof getCookedFishGain === 'function'
+      ? getCookedFishGain(slot.data)
+      : (Number(slot.data.weight) || 0) * (eff ? eff.legacyPerWeight || 0 : 0) * (Number(slot.data.effectMult) || 1);
+    const valStr = eff && eff.stat === 'qinggongExp' ? Math.round(gain).toString() : gain.toFixed(4);
+    return `以${fishDef ? fishDef.name : '鱼'}烤制而成。食用后${eff ? eff.label : '属性'} +${valStr}`;
   }
-  if (FISH_EFFECTS[slot.id] && slot.data && slot.data.weight != null) {
+  if (FISH_EFFECTS[slot.id] && slot.data && (slot.data.quality != null || slot.data.weight != null)) {
     const eff = FISH_EFFECTS[slot.id];
-    const gain = (Number(slot.data.weight) || 0) * eff.perWeight;
-    return `${def.desc || ''} 食用后${eff.label} +${gain.toFixed(4)}`;
+    const gain = typeof getRawFishGain === 'function'
+      ? getRawFishGain(slot.id, slot.data)
+      : (Number(slot.data.weight) || 0) * (eff.legacyPerWeight || 0);
+    const valStr = eff.stat === 'qinggongExp' ? Math.round(gain).toString() : gain.toFixed(4);
+    return `${def.desc || ''} 食用后${eff.label} +${valStr}`;
   }
   return def.desc || '';
 }
@@ -105,7 +111,10 @@ function renderBag() {
     if (slot.id === 'kaoyu' && slot.data) {
       sub = `品质 ${Math.round(slot.data.quality || 0)}`;
     } else if (slot.data && slot.data.weight != null) {
-      sub = `${slot.data.weight.toFixed(2)} s`;
+      sub = `${Number(slot.data.weight).toFixed(2)} s` +
+        (slot.data.quality != null ? ` · 品质 ${Math.round(Number(slot.data.quality) || 0)}` : '');
+    } else if (slot.data && slot.data.quality != null) {
+      sub = `品质 ${Math.round(Number(slot.data.quality) || 0)}`;
     } else {
       sub = escapeHtml(def.type);
     }
@@ -136,9 +145,15 @@ function openBagItem(idx) {
   const useAllBtn = $('bagUseAllBtn');
 
   const displayName = getItemDisplayName(slot);
-  const wTxt = (slot.data && slot.data.weight != null && slot.id !== 'kaoyu')
-    ? `　${slot.data.weight.toFixed(2)} s`
-    : (slot.id === 'kaoyu' && slot.data ? `　品质 ${Math.round(Number(slot.data.quality) || 0)}` : '');
+  let wTxt = '';
+  if (slot.id === 'kaoyu' && slot.data) {
+    wTxt = `　品质 ${Math.round(Number(slot.data.quality) || 0)}`;
+  } else if (slot.data && (slot.data.weight != null || slot.data.quality != null)) {
+    const parts = [];
+    if (slot.data.weight != null) parts.push(`${Number(slot.data.weight).toFixed(2)} s`);
+    if (slot.data.quality != null) parts.push(`品质 ${Math.round(Number(slot.data.quality) || 0)}`);
+    wTxt = `　${parts.join(' · ')}`;
+  }
   if (titleEl) titleEl.textContent = `${displayName}${wTxt}　×${slot.qty}`;
   if (descEl) descEl.textContent = getBagItemDesc(slot);
   if (useBtn) {
@@ -159,16 +174,32 @@ function closeBagItem() {
   if (modal) modal.classList.remove('show');
 }
 
+function getTotalQinggongExp() {
+  if (!Array.isArray(player.skills)) return 0;
+  let total = 0;
+  for (const sk of player.skills) {
+    if (!sk || typeof skillMatchesCategory !== 'function' || !skillMatchesCategory(sk, '轻功')) continue;
+    const lv = Math.max(1, Number(sk.level) || 1);
+    for (let i = 1; i < lv; i++) {
+      total += getSkillExpNeed(i, sk);
+    }
+    total += Number(sk.exp) || 0;
+  }
+  return total;
+}
+
 function snapshotPlayer() {
   return {
-    root: player.root,
+    root: getTotalRoot(),
     comp: getTotalComp(),
+    luck: getTotalLuck(),
     con: getTotalCon(),
     neiLi: getTotalNeiLi(),
     hp: player.hp,
+    qinggongExp: getTotalQinggongExp(),
     fist: getTotalFist(),
     blade: getTotalBlade(),
-    sword: player.sword,
+    sword: getTotalSword(),
     changbing: getTotalChangbing(),
     qimen: getTotalQimen(),
     hidden: getTotalHidden()
@@ -177,7 +208,8 @@ function snapshotPlayer() {
 
 function diffSnapshot(before, after) {
   const labels = {
-    root: '根骨', comp: '悟性', con: '体魄', neiLi: '内力', hp: '气血',
+    root: '根骨', comp: '悟性', luck: '定力', con: '体魄', neiLi: '内力', hp: '气血',
+    qinggongExp: '轻功经验',
     fist: '拳掌', blade: '刀法', sword: '剑法', changbing: '长兵', qimen: '奇门', hidden: '暗器'
   };
   const out = [];
@@ -186,7 +218,8 @@ function diffSnapshot(before, after) {
     if (Math.abs(delta) < 1e-9) continue;
     const sign = delta > 0 ? '+' : '';
     let v;
-    if (Math.abs(delta) >= 100) v = Math.round(delta).toString();
+    if (key === 'qinggongExp') v = Math.round(delta).toString();
+    else if (Math.abs(delta) >= 100) v = Math.round(delta).toString();
     else if (Math.abs(delta) >= 10) v = delta.toFixed(1);
     else if (Math.abs(delta) >= 1) v = delta.toFixed(2);
     else v = delta.toFixed(4);

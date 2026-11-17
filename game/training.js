@@ -68,15 +68,19 @@ function getSkillDifficultyMultiplier(skill) {
   return Number.isFinite(value) && value > 0 ? value : 1;
 }
 const TRAINING_ACTIVITY = {
-  external: { label:'瀑布锻体', interactionEfficiency:35, cat:'外功', btnId:'trainExternalBtn' },
-  internal: { label:'打坐入定', interactionEfficiency:25, cat:'内功', btnId:'trainInternalBtn' },
-  dummy:    { label:'打木桩',   interactionEfficiency:25, cat:'招式', btnId:'trainDummyBtn' },
-  plum:     { label:'梅花桩',   interactionEfficiency:25, cat:'轻功', btnId:'trainPlumBtn' }
+  external:        { label:'瀑布锻体', interactionEfficiency:35, cat:'外功', btnId:'trainExternalBtn' },
+  internal:        { label:'打坐入定', interactionEfficiency:25, cat:'内功', btnId:'trainInternalBtn' },
+  dummy:           { label:'打木桩',   interactionEfficiency:25, cat:'招式', btnId:'trainDummyBtn' },
+  plum:            { label:'梅花桩',   interactionEfficiency:25, cat:'轻功', btnId:'trainPlumBtn' },
+  capitalInternal: { label:'打坐入定', interactionEfficiency:65, cat:'内功', btnId:'trainCapitalInternalBtn' },
+  stoneLock:       { label:'石锁锤炼', interactionEfficiency:65, cat:'外功', btnId:'trainStoneLockBtn' },
+  waterPlum:       { label:'水上梅桩', interactionEfficiency:65, cat:'轻功', btnId:'trainWaterPlumBtn' },
+  sparPractice:    { label:'招式对练', interactionEfficiency:85, cat:'招式', btnId:'trainSparPracticeBtn' }
 };
 
 function getSkillExpNeed(level, skill) {
   const n = Math.max(1, Number(level) || 1);
-  const value = Math.pow(100 + n * 50 + 15 * n * (n-1), 1 + n / 250);
+  const value = Math.pow(150 + n * 50 + 15 * n * (n-1), 1 + n / 250);
   const base = Number.isFinite(value) ? value : Number.MAX_VALUE;
   if (base === Number.MAX_VALUE) return base;
   return base * getSkillDifficultyMultiplier(skill);
@@ -228,11 +232,12 @@ function updateTrainingUI() {
   const status = $('trainingStatus');
   if (!status) return;
 
+  const fishPlace = (typeof storyFlags !== 'undefined' && storyFlags.arrivedCapital) ? '城外钓鱼' : '溪边垂钓';
   if (fishing.running && player.trainingActivity && getFishingLevel() >= 100) {
     const concurrentSkill = getTrainingSkillForActivity();
-    status.textContent = `正在溪边垂钓……｜同时${concurrentSkill ? `进行${TRAINING_ACTIVITY[player.trainingActivity].label} · ${concurrentSkill.name}` : '进行其他行动'}`;
+    status.textContent = `正在${fishPlace}……｜同时${concurrentSkill ? `进行${TRAINING_ACTIVITY[player.trainingActivity].label} · ${concurrentSkill.name}` : '进行其他行动'}`;
   } else if (fishing.running) {
-    status.textContent = `正在溪边垂钓……`;
+    status.textContent = `正在${fishPlace}……`;
   } else {
     const skill = getTrainingSkillForActivity();
     if (!player.trainingActivity || !skill) {
@@ -262,3 +267,11 @@ const trainDummyBtnEl = $('trainDummyBtn');
 if (trainDummyBtnEl) trainDummyBtnEl.addEventListener('click',()=>startTraining('dummy'));
 const trainPlumBtnEl = $('trainPlumBtn');
 if (trainPlumBtnEl) trainPlumBtnEl.addEventListener('click',()=>startTraining('plum'));
+const trainCapitalInternalBtnEl = $('trainCapitalInternalBtn');
+if (trainCapitalInternalBtnEl) trainCapitalInternalBtnEl.addEventListener('click',()=>startTraining('capitalInternal'));
+const trainStoneLockBtnEl = $('trainStoneLockBtn');
+if (trainStoneLockBtnEl) trainStoneLockBtnEl.addEventListener('click',()=>startTraining('stoneLock'));
+const trainWaterPlumBtnEl = $('trainWaterPlumBtn');
+if (trainWaterPlumBtnEl) trainWaterPlumBtnEl.addEventListener('click',()=>startTraining('waterPlum'));
+const trainSparPracticeBtnEl = $('trainSparPracticeBtn');
+if (trainSparPracticeBtnEl) trainSparPracticeBtnEl.addEventListener('click',()=>startTraining('sparPractice'));

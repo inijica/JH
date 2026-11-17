@@ -5,7 +5,7 @@ const HAORAN_SHIELD_PER_LAYER = 100;
 const JIUMAI_SPEED_DOWN = 0.01;
 const JIUMAI_DECAY_MS = 3000;
 
-/* 【撼山势】：震山拳施展后叠一层，上限 100 层，每层攻击附加体魄×0.05 的基础伤害 */
+/* 【撼山势】：震山拳施展后叠一层，上限 100 层，每层攻击附加体魄×0.08 的基础伤害 */
 const HANSHAN_MAX_LAYERS = 100;
 /* 【打穴】：飞石破命中后给敌人叠一层，无上限，每层降低 0.5 内力；随时间消退 */
 const DAXUE_NEILI_DOWN = 0.5;
@@ -14,6 +14,8 @@ const JIUSI_SITUI_MAX = 9;
 const JIUSI_SITUI_EVA = 0.03;
 /* 【流血】：每层每秒流失的气血 */
 const BLEED_DAMAGE_PER_STACK_PER_SEC = 2;
+/* 【诡异毒素】：每层每秒流失的气血（对超大型白衣怪人转为等量回血） */
+const WEIRD_POISON_PER_STACK_PER_SEC = 1;
 
 /* 战斗状态（唯一实例） */
 const battle = {
@@ -36,7 +38,8 @@ const battle = {
   bondStrategyCursor: 0,
   bondStrategyRemaining: [],
   startEffectsDone: false,
-  lastHanShanAt: 0
+  lastHanShanAt: 0,
+  lastWeirdPoisonAt: 0
 };
 
 function battleActive() {
@@ -155,6 +158,7 @@ function buildPlayerFighter() {
     hidden: getTotalHidden(),
     accuracy: getAccuracyRate(),
     evasion: getEvasionRate(),
+    bondEvasionBonus: 0,
     root: getTotalRoot(),
     comp: getTotalComp(),
     luck: getTotalLuck(),
@@ -214,7 +218,7 @@ function buildBondCompanionFighter() {
     qimen: (BOND_CHAR.qimen + extraStats.qimen) * boost,
     hidden: (getBondHidden() + extraStats.hidden) * boost,
     accuracy: 0.9 + qy * 0.0075,
-    evasion: 0.05 + qy * 0.01 + (qy >= 25 ? 0.1 : 0),
+    evasion: 0.10 + qy * 0.01 + (qy >= 25 ? 0.1 : 0),
     root: getBondRoot() * boost,
     comp: getBondComp() * boost,
     luck: getBondLuck() * boost,
@@ -243,8 +247,9 @@ function applyBondSameCampBonus(allies) {
   const companionFighter = allies.find(f => f && f.isCompanion && f.hp > 0);
   if (!playerFighter || !companionFighter) return;
   if (!Array.isArray(battle.enemies) || !battle.enemies.some(f => f && f.hp > 0)) return;
-  playerFighter.evasion = Math.min(1, (Number(playerFighter.evasion) || 0) + 0.2);
-  companionFighter.evasion = Math.min(1, (Number(companionFighter.evasion) || 0) + 0.2);
+  playerFighter.bondEvasionBonus = 0.2;
+  playerFighter.evasion = (Number(playerFighter.evasion) || 0) + 0.2;
+  companionFighter.evasion = (Number(companionFighter.evasion) || 0) + 0.2;
   playerFighter.speed = (Number(playerFighter.speed) || 0) + (Number(companionFighter.speed) || 0) / 10;
 }
 
@@ -278,6 +283,12 @@ function dealSegmentDamage(side, target, damage) {
   let remaining = Math.max(0, Number(damage) || 0);
   let cur = (target && target.hp > 0) ? target : pickWeightedTarget(side.filter(f => f.hp > 0));
   const report = { applied: 0, absorbed: 0, hits: [], finalAlive: cur };
+  if (remaining <= 0) {
+    if (cur && cur.hp > 0) {
+      report.hits.push({ fighter: cur, applied: 0, absorbed: 0, killed: false });
+    }
+    return report;
+  }
   let guard = 0;
   while (remaining > 0 && guard++ < 64) {
     const living = side.filter(f => f && f.hp > 0);
@@ -318,8 +329,8 @@ function fighterNeiLi(f) {
 /* 有效闪避：玩家及使用九思剑法的同伴额外计入【思退】层数 */
 function fighterEvasion(f) {
   if (!f) return 0;
-  const base = f.isPlayer ? getEvasionRate() : (Number(f.evasion) || 0);
-  return Math.min(1, base + (Number(f.siTuiLayers) || 0) * JIUSI_SITUI_EVA);
+  const base = f.isPlayer ? (getEvasionRate() + (Number(f.bondEvasionBonus) || 0)) : (Number(f.evasion) || 0);
+  return Math.max(0, base + (Number(f.siTuiLayers) || 0) * JIUSI_SITUI_EVA);
 }
 
 function fighterAttackValue(f, stat) {
@@ -367,8 +378,7 @@ function resolveAllyDodge(attacker, target) {
   let overflow = 0;
   if (enemyXushi) {
     acc = baseAcc * 1.5;
-    const raw = acc - eva;
-    if (raw > 1) overflow = raw - 1;
+    overflow = calcAccuracyOverflow(acc, eva);
   }
   let dodged = rollDodge(acc, eva);
   let dodgeKind = '';
@@ -441,6 +451,7 @@ function getPlayerAttackStyle() {
 function doPlayerAttack() {
   if (player.strategy && player.strategy.enabled) {
     if (tryLowHpStrategy()) return;
+    if (typeof tryAllyLowHpStrategy === 'function' && tryAllyLowHpStrategy()) return;
     const sid = resolveStrategySkill();
     if (sid === 'feishipo') return doFeishipoAttack();
     if (sid === 'zhenshan') return doZhenshanAttack();
@@ -556,17 +567,21 @@ function doPaodingDaoAttack() {
   }
 }
 
-/* 玩家特技：与赵大夫的金针渡穴一致，治疗气血比例最低的友方，随后停止行动 3 秒 */
-function doPlayerJinzhen() {
+/* 玩家特技：与赵大夫的金针渡穴一致，可治疗指定同伴或气血比例最低的己方成员，随后停止行动 3 秒 */
+function doPlayerJinzhen(preferredTarget) {
   const me = playerFighter();
   if (!me || me.hp <= 0) return;
   if (me.jinzhenUsed) {
     addLog('【金针渡穴】此战金针已用过，无法再次施针。', '');
     return;
   }
+  if (preferredTarget && preferredTarget.hp > 0 && preferredTarget.maxHp > 0 && preferredTarget.hp < preferredTarget.maxHp) {
+    doJinzhen(me, [preferredTarget]);
+    return;
+  }
   const injured = (battle.allies || []).filter(f => f && f.hp > 0 && f.maxHp > 0 && f.hp < f.maxHp);
   if (!injured.length) {
-    addLog('【金针渡穴】同伴气血充盈，你无须施针。', '');
+    addLog('【金针渡穴】己方气血充盈，你无须施针。', '');
     return;
   }
   doJinzhen(me, injured);
@@ -652,8 +667,7 @@ function performStrike(opts) {
   let xuriOverflow = 0;
   if (xushi) {
     acc = baseAcc * 1.5;
-    const raw = acc - (Number(initialTarget.evasion) || 0);
-    if (raw > 1) xuriOverflow = raw - 1;
+    xuriOverflow = calcAccuracyOverflow(acc, fighterEvasion(initialTarget));
   }
   acc += Number(opts.accuracyBonus) || 0;
 
@@ -671,7 +685,7 @@ function performStrike(opts) {
     if (!cur || cur.hp <= 0) cur = pickWeightedTarget(alive);
     if (!cur) break;
     const e = cur;
-    const hitChance = Math.max(0, Math.min(1, acc - (Number(e.evasion) || 0)));
+    const hitChance = calcHitChance(acc, fighterEvasion(e));
     if (Math.random() >= hitChance) { missSegments++; continue; }
     let dmg = opts.calcDamage(stats.multiplier, effectMultiplier, e);
     if (xuriOverflow > 0) dmg *= (1 + xuriOverflow);
@@ -706,7 +720,7 @@ function performStrike(opts) {
   }
 
   if (hitSegments <= 0) {
-    addLog(`你施展【${name}】，却尽数被闪避（命中率 ${formatPercent(Math.max(0, Math.min(1, acc - (Number(initialTarget.evasion) || 0))))}）`, '');
+    addLog(`你施展【${name}】，却尽数被闪避（命中率 ${formatPercent(calcHitChance(acc, fighterEvasion(initialTarget)))}）`, '');
     if (typeof storyBattleAfterAttack === 'function') {
       storyBattleAfterAttack({
         attacker: playerFighter(),
@@ -721,10 +735,10 @@ function performStrike(opts) {
   const neiBonus = Math.round(getNeiLiDamageBonus() * scale * 10) / 10;
   const totalDamage = Math.round((segmentDamage + neiBonus) * 10) / 10;
 
-  const targetText = [...touched.keys()].join('、');
+  const targetText = touched.size > 0 ? [...touched.keys()].join('、') : (initialTarget.name || '');
   const detail = [`${hitSegments}段命中`];
   if (missSegments) detail.push(`${missSegments}段被闪避`);
-  if (xushi) detail.push(`虚实莫测·命中 ${formatPercent(Math.max(0, Math.min(1, acc - (Number(initialTarget.evasion) || 0))))}`);
+  if (xushi) detail.push(`虚实莫测·命中 ${formatPercent(calcHitChance(acc, fighterEvasion(initialTarget)))}`);
   if (xuriOverflow > 0) detail.push(`溢出命中增伤 +${Math.round(xuriOverflow * 100)}%`);
   if (absorbedTotal > 0) detail.push(`浩然气化去 ${fmtNum(absorbedTotal)} 点`);
   if (scale < 1) detail.push(`效果 ${Math.round(scale * 100)}%`);
@@ -818,11 +832,12 @@ function doJinzhen(e, injured) {
   lowest.hp = Math.min(lowest.maxHp, lowest.hp + healRaw);
   const healed = Math.round((lowest.hp - before) * 10) / 10;
   const who = lowest.isPlayer ? '你' : lowest.name;
-  addLog(`【金针渡穴】${e.name} 取出金针，为${who}疏通经络，恢复 ${fmtNum(healed)} 点气血。`, 'win');
+  const caster = e.isPlayer ? '你' : e.name;
+  addLog(`【金针渡穴】${caster} 取出金针，为${who}疏通经络，恢复 ${fmtNum(healed)} 点气血。`, 'win');
   shakeCard(lowest);
   e.stunUntil = (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now()) + 3000;
   e.bar = 0;
-  addLog(`【金针渡穴】${e.name} 收针调息，三息之内不再动作。`, '');
+  addLog(`【金针渡穴】${caster} 收针调息，三息之内不再动作。`, '');
 }
 
 function doEnemyAttack(e) {
@@ -898,7 +913,7 @@ function doEnemyAttack(e) {
   const who = target.isPlayer ? '你' : target.name;
   const notes = [];
   if (segNote) notes.push(segNote);
-  if (dodge.enemyXushi) notes.push(`虚实莫测·命中 ${formatPercent(Math.min(1, dodge.acc - dodge.eva))}`);
+  if (dodge.enemyXushi) notes.push(`虚实莫测·命中 ${formatPercent(calcHitChance(dodge.acc, dodge.eva))}`);
   if (dodge.overflow > 0) notes.push(`溢出命中增伤 +${Math.round(dodge.overflow * 100)}%`);
   addLog(`${e.name} 施展【${e.attack ? e.attack.name : '攻势'}】，对${who}造成 ${fmtNum(dmg)} 点伤害${notes.length ? `（${notes.join('，')}）` : ''}`, 'dmg');
   shakeCard(target);
@@ -997,7 +1012,9 @@ function doCompanionAction(f) {
 
   let chosenSkillId = '';
   if (f.id === BOND_SPAR_ID && player.bondStrategy && player.bondStrategy.enabled) {
-    chosenSkillId = tryBondLowHpStrategy(f) || resolveBondStrategySkill();
+    chosenSkillId = tryBondLowHpStrategy(f)
+      || (typeof tryBondAllyLowHpStrategy === 'function' ? tryBondAllyLowHpStrategy(f) : '')
+      || resolveBondStrategySkill();
   }
   const spec = getBondCompanionSkillSpec(chosenSkillId, f);
 
@@ -1020,7 +1037,7 @@ function doCompanionAction(f) {
     if (!alive.length || battle.over) break;
     if (!cur || cur.hp <= 0) cur = pickWeightedTarget(alive);
     if (!cur) break;
-    const hitChance = Math.max(0, Math.min(1, acc - (Number(cur.evasion) || 0)));
+    const hitChance = calcHitChance(acc, fighterEvasion(cur));
     if (Math.random() >= hitChance) { missSegments++; continue; }
 
     const own = fighterAttackValue(f, spec.stat);
@@ -1065,7 +1082,7 @@ function doCompanionAction(f) {
     }
     return;
   }
-  const targetText = [...touched.keys()].join('、');
+  const targetText = touched.size > 0 ? [...touched.keys()].join('、') : (firstTarget.name || '');
   const detail = [`${hitSegments}段命中`];
   if (missSegments) detail.push(`${missSegments}段被闪避`);
   if (absorbedTotal > 0) detail.push(`浩然气化去 ${fmtNum(absorbedTotal)} 点`);
@@ -1074,10 +1091,11 @@ function doCompanionAction(f) {
     detail.push([...touched.entries()].map(([n, t]) => `${n} ${fmtNum(Math.round(t.applied * 10) / 10)} 点`).join('，'));
   }
   addLog(`${f.name} 施展【${spec.name}】，对${targetText}造成 ${fmtNum(Math.round(dmgTotal * 10) / 10)} 点伤害（${detail.join('，')}）`, 'dmg');
-  shakeCard(cur);
+  shakeCard(cur || firstTarget);
 
   /* 同伴攻击同样会触发【无咎】反击：反击由出手的同伴本人承受（书童亦不例外） */
-  if (cur && cur.hp > 0 && !battle.over) doWujiuCounter(cur, hits, f);
+  const counterTarget = cur || firstTarget;
+  if (counterTarget && counterTarget.hp > 0 && !battle.over) doWujiuCounter(counterTarget, hits, f);
 }
 
 function doFighterAction(f) {
@@ -1319,6 +1337,44 @@ function battleStep(dt) {
     }
     if (anyBleed && !battle.over) checkBattleEnd();
     if (battle.over || !battleRunning) return;
+  }
+
+  /* 【诡异毒素】：超大型白衣怪人在场时，每秒给在场所有存活角色（含自己）叠加一层；
+     每层每秒流失 1 点气血，对超大型白衣怪人则转变为每秒回复 1 点气血 */
+  {
+    const hasGiant = (battle.enemies || []).some(e => e && e.hp > 0 && e.isGiantWhiteRobe);
+    const anyPoisoned = allFighters().some(f => f && f.hp > 0 && Number(f.weirdPoisonStacks) > 0);
+    if (hasGiant || anyPoisoned) {
+      if (!battle.lastWeirdPoisonAt) battle.lastWeirdPoisonAt = nowSt;
+      const pTicks = Math.floor((nowSt - battle.lastWeirdPoisonAt) / 1000);
+      if (pTicks > 0) {
+        battle.lastWeirdPoisonAt += pTicks * 1000;
+        let anyWeirdHit = false;
+        let firstSpread = false;
+        for (const f of allFighters()) {
+          if (!f || f.hp <= 0) continue;
+          if (hasGiant) {
+            const prev = Math.floor(Number(f.weirdPoisonStacks) || 0);
+            f.weirdPoisonStacks = prev + pTicks;
+            if (prev === 0) firstSpread = true;
+          }
+          const stacks = Math.floor(Number(f.weirdPoisonStacks) || 0);
+          if (stacks <= 0) continue;
+          const amt = stacks * pTicks * WEIRD_POISON_PER_STACK_PER_SEC;
+          if (f.weirdPoisonHeal) {
+            if (f.hp < f.maxHp) f.hp = Math.min(f.maxHp, f.hp + amt);
+          } else {
+            f.hp = Math.max(0, f.hp - amt);
+            anyWeirdHit = true;
+          }
+        }
+        if (firstSpread) {
+          addLog('【诡异毒素】超大型白衣怪人周身毒瘴扩散，在场众人皆染上了【诡异毒素】！', 'dmg');
+        }
+        if (anyWeirdHit && !battle.over) checkBattleEnd();
+        if (battle.over || !battleRunning) return;
+      }
+    }
   }
 
   /* 所有人同时推进行动条：

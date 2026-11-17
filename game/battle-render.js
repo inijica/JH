@@ -116,6 +116,9 @@ function fighterStateNotes(f) {
   if (f.bleedStacks !== undefined && Number(f.bleedStacks) > 0) {
     notes.push(`流血 ${Math.floor(Number(f.bleedStacks))} 层`);
   }
+  if (f.weirdPoisonStacks !== undefined && Number(f.weirdPoisonStacks) > 0) {
+    notes.push(`诡异毒素 ${Math.floor(Number(f.weirdPoisonStacks))} 层`);
+  }
   const battleNow = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   if (f.stunUntil && battleNow < f.stunUntil) {
     notes.push(`运针调息 ${Math.ceil((f.stunUntil - battleNow) / 1000)} 秒`);

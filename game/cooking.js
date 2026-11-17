@@ -17,13 +17,29 @@ function getFishStock() {
   return stock;
 }
 
+function getCookingStoveInfo() {
+  if (typeof storyFlags !== 'undefined' && storyFlags.arrivedCapital) {
+    return { name: '小宅灶台', title: '住 处 · 灶 台 烹 饪', bonus: 20 };
+  }
+  const baseBonus = (typeof COOK_RECIPES !== 'undefined' && COOK_RECIPES[cookingState.recipe])
+    ? COOK_RECIPES[cookingState.recipe].stoveBonus
+    : 5;
+  return { name: '后山火堆', title: '后 山 · 火 堆 烹 饪', bonus: baseBonus };
+}
+
 function consumeFishByType(fishId, count) {
   const consumed = [];
   for (let i = player.inventory.length - 1; i >= 0 && consumed.length < count; i--) {
     const slot = player.inventory[i];
     if (!slot || slot.id !== fishId) continue;
     while (slot.qty > 0 && consumed.length < count) {
-      consumed.push({ fishId, weight: slot.data ? Number(slot.data.weight) || 0 : 0 });
+      consumed.push({
+        fishId,
+        weight: slot.data ? Number(slot.data.weight) || 0 : 0,
+        fishQuality: slot.data && slot.data.quality != null && Number.isFinite(Number(slot.data.quality))
+          ? Number(slot.data.quality)
+          : null
+      });
       slot.qty--;
     }
     if (slot.qty <= 0) player.inventory.splice(i, 1);
@@ -70,13 +86,16 @@ function renderCookingUI() {
     </div>`;
   }
 
+  const stove = getCookingStoveInfo();
+  const headTitle = document.querySelector('#cookingOverlay .cooking-head span');
+  if (headTitle) headTitle.textContent = stove.title;
+
   const stoveEl = $('stoveInfo');
   if (stoveEl) {
-    const recipe = COOK_RECIPES[cookingState.recipe];
     stoveEl.innerHTML = `<div class="stove-card">
       <div class="stove-icon">🔥</div>
-      <div class="stove-name">后山火堆</div>
-      <div class="stove-bonus">烹饪品质 +${recipe.stoveBonus}</div>
+      <div class="stove-name">${escapeHtml(stove.name)}</div>
+      <div class="stove-bonus">烹饪品质 +${stove.bonus}</div>
     </div>`;
   }
 
@@ -204,7 +223,7 @@ function finishCooking() {
   const items = cookingState.pending || [];
   cookingState.pending = [];
 
-  const stoveBonus = COOK_RECIPES[cookingState.recipe].stoveBonus;
+  const stoveBonus = getCookingStoveInfo().bonus;
   const results = [];
   const t = ensurePaodingTechnique();
   let leveledAny = false;
@@ -221,6 +240,7 @@ function finishCooking() {
         fishId: it.fishId,
         fishName,
         weight: it.weight,
+        fishQuality: it.fishQuality,
         quality,
         name,
         effectMult: tier.effectMult
@@ -327,6 +347,14 @@ if (cookingCloseBtnEl) cookingCloseBtnEl.addEventListener('click', closeCooking)
 if (cookingOpenBtnEl) {
   cookingOpenBtnEl.addEventListener('click', () => {
     if (!storyFlags.cookingUnlocked) return;
+    openCooking();
+  });
+}
+const capitalCookBtnEl = $('capitalCookBtn');
+if (capitalCookBtnEl) {
+  capitalCookBtnEl.addEventListener('click', () => {
+    if (!storyFlags.arrivedCapital) return;
+    ensurePaodingTechnique();
     openCooking();
   });
 }
