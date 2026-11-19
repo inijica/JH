@@ -28,6 +28,7 @@ function getVegStock() {
 }
 
 function getCookingRecipeStock(recipeId = cookingState.recipe) {
+  if (recipeId === 'shuizhuShucai') return getVegStock();
   const stock = getFishStock();
   if (recipeId === 'shucaiDunyu') {
     const vStock = getVegStock();
@@ -38,8 +39,9 @@ function getCookingRecipeStock(recipeId = cookingState.recipe) {
 
 function getAvailableCookRecipes() {
   const list = [COOK_RECIPES.kaoyu];
-  if (typeof storyFlags !== 'undefined' && storyFlags.farmUnlocked && COOK_RECIPES.shucaiDunyu) {
-    list.push(COOK_RECIPES.shucaiDunyu);
+  if (typeof storyFlags !== 'undefined' && storyFlags.farmUnlocked) {
+    if (COOK_RECIPES.shucaiDunyu) list.push(COOK_RECIPES.shucaiDunyu);
+    if (COOK_RECIPES.shuizhuShucai) list.push(COOK_RECIPES.shuizhuShucai);
   }
   return list.filter(Boolean);
 }
@@ -178,6 +180,12 @@ function buildCookedName(fishName, tier) {
   return '烤' + fishName + tier.suffix;
 }
 
+function buildBoiledVegName(vegName, tier) {
+  if (tier.tier === 'burnt') return '煮糊的' + vegName;
+  if (tier.tier === 'half') return '半生的' + vegName;
+  return '水煮' + vegName + tier.suffix;
+}
+
 /* 蔬菜炖鱼品质分段 */
 function getStewTier(quality) {
   if (quality <= 70) return { tier: 'unknown', suffix: '', effectMult: 0.5 };
@@ -274,6 +282,20 @@ function renderCookingUI() {
         </div>`;
         ingEl.innerHTML = html;
       }
+    } else if (cookingState.recipe === 'shuizhuShucai') {
+      const vegStock = getVegStock();
+      const vegIds = Object.keys(vegStock).filter(id => vegStock[id] > 0);
+      if (!vegIds.length) {
+        ingEl.innerHTML = '<div class="ing-empty">背包里没有可用的蔬菜食材</div>';
+      } else {
+        let html = renderIngredientRows(vegIds, vegStock);
+        const hasSelected = Object.values(cookingState.selected).some(v => v > 0);
+        html += `<div class="ing-footer">
+          <button type="button" class="ing-clear ing-fill" id="cookingFillAllBtn">投 入 全 部</button>
+          <button type="button" class="ing-clear" id="cookingClearAllBtn" ${hasSelected ? '' : 'disabled'}>清 空 食 材</button>
+        </div>`;
+        ingEl.innerHTML = html;
+      }
     } else {
       if (!fishIds.length) {
         ingEl.innerHTML = '<div class="ing-empty">背包里没有可用的鱼类食材</div>';
@@ -321,6 +343,10 @@ function updateCookingUI() {
       } else {
         statusEl.textContent = `已选择 鱼类 ${fishCount} 条 / 蔬菜 ${vegCount} 份（需保持 1:1 数量配对）`;
       }
+    } else if (cookingState.recipe === 'shuizhuShucai') {
+      statusEl.textContent = vegCount > 0
+        ? `已选择 ${vegCount} 份蔬菜，点击开始烹饪`
+        : '选择食材后点击烹饪';
     } else {
       statusEl.textContent = fishCount > 0
         ? `已选择 ${fishCount} 条鱼，点击开始烹饪`
@@ -333,7 +359,7 @@ function openCooking() {
   cookingState.selected = {};
   cookingState.running = false;
   cookingState.pending = [];
-  if (cookingState.recipe === 'shucaiDunyu' && !(typeof storyFlags !== 'undefined' && storyFlags.farmUnlocked)) {
+  if ((cookingState.recipe === 'shucaiDunyu' || cookingState.recipe === 'shuizhuShucai') && !(typeof storyFlags !== 'undefined' && storyFlags.farmUnlocked)) {
     cookingState.recipe = 'kaoyu';
   }
   const fill = $('cookingProgressFill');
@@ -416,6 +442,35 @@ function startCooking() {
       });
     }
     cookingState.pending = pending;
+  } else if (cookingState.recipe === 'shuizhuShucai') {
+    const stock = getVegStock();
+    const plan = [];
+    for (const vegId in cookingState.selected) {
+      if (!(typeof VEG_EFFECTS !== 'undefined' && VEG_EFFECTS[vegId])) continue;
+      const cnt = Math.min(cookingState.selected[vegId] || 0, stock[vegId] || 0);
+      if (cnt > 0) plan.push({ vegId, count: cnt });
+    }
+    if (!plan.length) {
+      showToast('请先选择食材');
+      return;
+    }
+
+    const consumed = [];
+    _bagRenderSuppress++;
+    try {
+      for (const p of plan) {
+        const items = consumeVegByType(p.vegId, p.count);
+        for (const it of items) consumed.push(it);
+      }
+    } finally {
+      _bagRenderSuppress--;
+    }
+    renderBag();
+    cookingState.pending = consumed.map(it => ({
+      recipe: 'shuizhuShucai',
+      vegId: it.vegId,
+      vegQuality: it.vegQuality
+    }));
   } else {
     const stock = getFishStock();
     const plan = [];
@@ -486,7 +541,8 @@ function finishCooking() {
     for (const it of items) {
       const level = getPaodingLevel();
       const quality = calcCookQuality(level, stoveBonus);
-      const isStew = it.recipe === 'shucaiDunyu' || (recipeId === 'shucaiDunyu' && it.vegId);
+      const isStew = it.recipe === 'shucaiDunyu' || (recipeId === 'shucaiDunyu' && it.vegId && it.fishId);
+      const isBoiled = it.recipe === 'shuizhuShucai' || (recipeId === 'shuizhuShucai' && it.vegId && !it.fishId);
 
       let outItemId = 'kaoyu';
       let itemData;
@@ -504,6 +560,19 @@ function finishCooking() {
           fishName,
           weight: it.weight,
           fishQuality: it.fishQuality,
+          vegId: it.vegId,
+          vegName,
+          vegQuality: it.vegQuality,
+          quality,
+          name,
+          effectMult: tier.effectMult
+        };
+      } else if (isBoiled && it.vegId) {
+        const tier = getCookTier(quality);
+        const vegName = ITEM_DEFS[it.vegId] ? ITEM_DEFS[it.vegId].name : '蔬菜';
+        const name = buildBoiledVegName(vegName, tier);
+        outItemId = 'shuizhuShucai';
+        itemData = {
           vegId: it.vegId,
           vegName,
           vegQuality: it.vegQuality,
@@ -587,7 +656,7 @@ if (cookingRecipeListEl) {
     if (!item) return;
     const id = item.dataset.recipe;
     if (!COOK_RECIPES[id] || id === cookingState.recipe) return;
-    if (id === 'shucaiDunyu' && !(typeof storyFlags !== 'undefined' && storyFlags.farmUnlocked)) return;
+    if ((id === 'shucaiDunyu' || id === 'shuizhuShucai') && !(typeof storyFlags !== 'undefined' && storyFlags.farmUnlocked)) return;
     cookingState.recipe = id;
     cookingState.selected = {};
     renderCookingUI();
@@ -616,6 +685,13 @@ if (cookingIngredientListEl) {
         const pickedFish = pickRandomStockCounts(fishStock, pairCount);
         const pickedVeg = pickRandomStockCounts(vegStock, pairCount);
         cookingState.selected = Object.assign({}, pickedFish, pickedVeg);
+      } else if (cookingState.recipe === 'shuizhuShucai') {
+        const vegStock = getVegStock();
+        const next = {};
+        for (const vid in vegStock) {
+          if (vegStock[vid] > 0) next[vid] = vegStock[vid];
+        }
+        cookingState.selected = next;
       } else {
         const next = {};
         for (const fid in fishStock) {

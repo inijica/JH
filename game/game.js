@@ -79,6 +79,7 @@ const player = {
   speed: 0.15,
   bondXiaPuying: 50,
   bondPeiWenxiu: 0,
+  bondDaoMiaomiao: 0,
   companionId: 'xiaPuying',
   bond: { neiLi: 0, levels: { qingyuan: 12, feishipo: 9, tanafa: 9 }, lastCultAt: 0 },
   skills: [],
@@ -388,7 +389,7 @@ function updateMapView() {
   if (cap) cap.style.display = storyFlags.arrivedCapital ? '' : 'none';
 }
 
-/* 京城住处：裴文秀与后院农田 */
+/* 京城住处与西巷、天街 */
 function updateCapitalNpcs() {
   const showPei = !!storyFlags.arrivedCapital && !storyFlags.capitalPeiTalkDone;
   const npc = $('npcPeiWenxiuCapital');
@@ -397,6 +398,19 @@ function updateCapitalNpcs() {
   if (row) row.style.display = showPei ? '' : 'none';
   const farmBtn = $('farmOpenBtn');
   if (farmBtn) farmBtn.style.display = (storyFlags.arrivedCapital && storyFlags.farmUnlocked) ? '' : 'none';
+
+  const showDistricts = !!storyFlags.arrivedCapital && !!storyFlags.capitalPeiTalkDone;
+  const westAlley = $('capitalWestAlley');
+  if (westAlley) westAlley.style.display = showDistricts ? '' : 'none';
+  const tianjie = $('capitalTianjie');
+  if (tianjie) tianjie.style.display = showDistricts ? '' : 'none';
+
+  const diziEl = $('npcQingchengDizi');
+  if (diziEl) diziEl.style.display = (showDistricts && !storyFlags.qingchengDiziDefeated) ? '' : 'none';
+  const shishuEl = $('npcShishu');
+  if (shishuEl) shishuEl.style.display = (showDistricts && storyFlags.qingchengDiziDefeated && !storyFlags.qingchengShishuDefeated) ? '' : 'none';
+  const laoShishuEl = $('npcLaoShishu');
+  if (laoShishuEl) laoShishuEl.style.display = (showDistricts && storyFlags.qingchengShishuDefeated) ? '' : 'none';
 }
 
 function renderMainTab() {
@@ -472,6 +486,14 @@ const storyFlags = {
   arrivedCapital: false,
   capitalPeiTalkDone: false,
   farmUnlocked: false,
+  qingchengDiziDefeated: false,
+  qingchengShishuRan: false,
+  qingchengShishuDefeated: false,
+  shishuSpared: false,
+  daoMiaomiaoFought: false,
+  daoMiaomiaoDefeated: false,
+  yuxuObtained: false,
+  yuxuFirstGranted: false,
   farewellTiezhu: false,
   farewellShip: false,
   farewellDaifu: false,
@@ -887,6 +909,9 @@ $('dialogOptions').addEventListener('click', (e) => {
   if (typeof opt.onSelect === 'function') opt.onSelect();
   if (opt.action === 'spar') { startSpar(opt.npc); return; }
   if (opt.action === 'peiSpar') { startPeiWenxiuStoryBattle(); return; }
+  if (opt.action === 'qingchengDiziBattle') { startWestAlleyStoryBattle('qingchengDizi'); return; }
+  if (opt.action === 'qingchengZhuanghanBattle') { startWestAlleyStoryBattle('qingchengZhuanghan'); return; }
+  if (opt.action === 'daoMiaomiaoBattle') { startWestAlleyStoryBattle('daoMiaomiao'); return; }
   if (opt.action === 'teachMedicine') { startMedicineLesson(); return; }
   if (opt.action === 'teachMartial') { startLiQianyuanLesson(); return; }
   if (opt.action === 'leave' || !opt.next) { showDialogNode('end'); return; }
@@ -1089,6 +1114,30 @@ if (npcPeiWenxiuCapitalEl) {
   npcPeiWenxiuCapitalEl.addEventListener('click', () => {
     if (!storyFlags.arrivedCapital || storyFlags.capitalPeiTalkDone) return;
     showDialogNode('capitalPeiTalk');
+  });
+}
+
+const npcQingchengDiziEl = $('npcQingchengDizi');
+if (npcQingchengDiziEl) {
+  npcQingchengDiziEl.addEventListener('click', () => {
+    if (!storyFlags.arrivedCapital || !storyFlags.capitalPeiTalkDone || storyFlags.qingchengDiziDefeated) return;
+    showDialogNode('qingchengDiziIntro');
+  });
+}
+
+const npcShishuEl = $('npcShishu');
+if (npcShishuEl) {
+  npcShishuEl.addEventListener('click', () => {
+    if (!storyFlags.arrivedCapital || !storyFlags.qingchengDiziDefeated || storyFlags.qingchengShishuDefeated) return;
+    showDialogNode(storyFlags.qingchengShishuRan ? 'shishuRetry' : 'shishuIntro');
+  });
+}
+
+const npcLaoShishuEl = $('npcLaoShishu');
+if (npcLaoShishuEl) {
+  npcLaoShishuEl.addEventListener('click', () => {
+    if (!storyFlags.arrivedCapital || !storyFlags.qingchengShishuDefeated) return;
+    showDialogNode((storyFlags.daoMiaomiaoFought || storyFlags.yuxuObtained) ? 'laoShishuRematch' : 'laoShishuIntro');
   });
 }
 
@@ -1310,7 +1359,15 @@ const BOND_SKILL_ORDER = ['qingyuan', 'feishipo', 'tanafa'];
 const BOND_SKILL_TEACH = {
   qingyuan: { name: '青鸢飞纵', type: '轻功', select: '轻功' },
   feishipo: { name: '飞石破', type: '暗器', select: '招式' },
-  tanafa: { name: '淬火呼吸法', type: '内功', select: '内功' }
+  tanafa: { name: '淬火呼吸法', type: '内功', select: '内功' },
+  zhenshan: { name: '震山拳', type: '招式', select: '招式' },
+  jiusi: { name: '九思剑法', type: '剑法', select: '招式' },
+  paodingDao: { name: '庖丁刀法', type: '刀法', select: '招式' },
+  taiyi: { name: '太乙伏魔剑', type: '剑法', select: '招式' },
+  lingxu: { name: '凌虚步', type: '轻功', select: '轻功' },
+  qiangshen: { name: '泥火锤锻篇', type: '外功', select: '外功' },
+  huomai: { name: '活脉养络法', type: '内功', select: '内功' },
+  yuxu: { name: '玉虚功', type: '内功', select: '内功' }
 };
 
 const BOND_SKILL_STARS = { qingyuan: 2, feishipo: 1, tanafa: 0 };
@@ -1445,10 +1502,15 @@ function getBondNeiLiBonus() {
 
 function getBondNeiLiRatePerMin() {
   const b = ensureBondChar();
+  const luckMult = 1 + Math.max(0, getBondLuck()) * 0.025;
   let perMin = calcNeiLiRate(b.levels.tanafa, getBondLuck());
   const huomaiLv = Math.floor(Number(b.levels.huomai) || 0);
-  if (huomaiLv > 0 && typeof HUOMAI_RATE_BASE === 'number' && typeof HUOMAI_RATE_PER_LEVEL === 'number') {
-    perMin += (HUOMAI_RATE_BASE + (huomaiLv - 1) * HUOMAI_RATE_PER_LEVEL) * (1 + Math.max(0, getBondLuck()) * 0.025);
+  if (huomaiLv > 0 && typeof HUOMAI_RATE_PER_LEVEL === 'number') {
+    perMin += (huomaiLv * HUOMAI_RATE_PER_LEVEL) * luckMult;
+  }
+  const yuxuLv = Math.floor(Number(b.levels.yuxu) || 0);
+  if (yuxuLv > 0 && typeof YUXU_RATE_PER_LEVEL === 'number') {
+    perMin += (yuxuLv * YUXU_RATE_PER_LEVEL) * luckMult;
   }
   return perMin * (1 + getBondValue() / 500);
 }
@@ -1610,8 +1672,8 @@ function makeBondSparEnemy() {
     changbing: changbing + extraStats.changbing,
     qimen: qimen + extraStats.qimen,
     hidden: hidden + extraStats.hidden,
-    accuracy: 0.9 + qy * 0.0075,
-    evasion: 0.10 + qy * 0.01 + (qy >= 25 ? 0.1 : 0),
+    accuracy: 0.9 + qy * 0.0075 + (extraStats.accuracy || 0),
+    evasion: 0.10 + qy * 0.01 + (qy >= 25 ? 0.1 : 0) + (extraStats.evasion || 0),
     root: getBondRoot(),
     comp: getBondComp(),
     luck: getBondLuck(),
@@ -1882,6 +1944,8 @@ function peiWenxiuStrike(e, opts) {
   const target = pickWeightedTarget((battle.allies || []).filter(f => f && f.hp > 0));
   if (!target) return;
   const who = target.isPlayer ? '你' : target.name;
+  const defenderHadEvaBuff = !!target.taiyiEvaBuff;
+  const defenderHadYuxuShield = (Number(target.yuxuShield) || 0) > 0;
 
   const own = fighterAttackValue(e, opts.stat);
   const against = fighterDefenseValue(target, opts.stat);
@@ -1890,6 +1954,10 @@ function peiWenxiuStrike(e, opts) {
   /* 与常规敌方攻击一致：先按段数累计，再统一减去一次减伤 */
   const perHitRaw = Math.max(0, (20 + own + (own - against / 2) * 2.5) *
     (Number(opts.multiplier) || 1) * 2 * bonus);
+
+  if (!opts.guaranteed && typeof consumeLingxuFirstDodge === 'function' && consumeLingxuFirstDodge(target, e, hitsPer)) {
+    return;
+  }
 
   let totalDmg = 0;
   let hitCount = 0;
@@ -1905,6 +1973,9 @@ function peiWenxiuStrike(e, opts) {
 
   if (hitCount <= 0) {
     addLog(`${who}侧身避开了${e.name}的【${opts.name}】。`, 'win');
+    if (typeof applyCompleteAttackDefenseReactions === 'function') {
+      applyCompleteAttackDefenseReactions({ attacker: e, defender: target, defenderHadEvaBuff, defenderHadYuxuShield, hitSegments: 0, missSegments: evadedCount });
+    }
     if (evadedCount > 0 && typeof tryPlayerJiusiCounter === 'function') {
       tryPlayerJiusiCounter(e, target, evadedCount);
     }
@@ -1912,16 +1983,35 @@ function peiWenxiuStrike(e, opts) {
   }
 
   totalDmg = Math.max(0, perHitRaw * hitCount - fighterDR(target));
+  const yiji = typeof resolveAttackYiji === 'function' ? resolveAttackYiji(e, target) : { triggered: false, mult: 1 };
+  if (yiji.triggered) totalDmg *= yiji.mult;
+  if (Number(e.damageDealtMult) > 0) totalDmg *= Number(e.damageDealtMult);
+  if (Number(target.damageTakenMult) > 0) totalDmg *= Number(target.damageTakenMult);
+  const xiejin = typeof resolveAttackXiejin === 'function' ? resolveAttackXiejin(target, e) : { triggered: false, reduce: 0 };
+  let xiejinCut = 0;
+  if (xiejin.triggered && totalDmg > 0) {
+    xiejinCut = Math.min(totalDmg, xiejin.reduce);
+    totalDmg = Math.max(0, totalDmg - xiejinCut);
+  }
   totalDmg = Math.round(totalDmg * 10) / 10;
-  target.hp -= totalDmg;
+  const res = typeof applyDamageToFighter === 'function'
+    ? applyDamageToFighter(target, totalDmg)
+    : (() => { target.hp -= totalDmg; return { applied: totalDmg, yuxuAbsorbed: 0 }; })();
 
   const notes = [];
   if (hitsPer > 1) notes.push(`${hitCount}/${hitsPer}段命中`);
   if (opts.guaranteed) notes.push('必定命中');
   if (opts.damageBonus) notes.push(`伤害 +${Math.round(opts.damageBonus * 100)}%`);
   if (evadedCount > 0) notes.push(`${evadedCount}段被闪避`);
-  addLog(`${e.name} 施展【${opts.name}】，对${who}造成 ${fmtNum(Math.round(totalDmg * 10) / 10)} 点伤害${notes.length ? `（${notes.join('，')}）` : ''}`, 'dmg');
+  if (yiji.triggered) notes.push(`一击制敌 ×${yiji.mult.toFixed(2)}`);
+  if (xiejinCut > 0) notes.push(`卸劲归元减免 ${fmtNum(Math.round(xiejinCut * 10) / 10)} 点`);
+  if (res.yuxuAbsorbed > 0) notes.push(`先天罡气抵消 ${fmtNum(Math.round(res.yuxuAbsorbed * 10) / 10)} 点`);
+  addLog(`${e.name} 施展【${opts.name}】，对${who}造成 ${fmtNum(Math.round(res.applied * 10) / 10)} 点伤害${notes.length ? `（${notes.join('，')}）` : ''}`, 'dmg');
   shakeCard(target);
+
+  if (typeof applyCompleteAttackDefenseReactions === 'function') {
+    applyCompleteAttackDefenseReactions({ attacker: e, defender: target, defenderHadEvaBuff, defenderHadYuxuShield, hitSegments: hitCount, missSegments: evadedCount });
+  }
 
   if (target.hp <= 0) {
     target.hp = 0;
@@ -1944,22 +2034,249 @@ function peiWenxiuCounter(attacker) {
   const e = (battle.enemies || []).find(f => f && f.npcId === 'peiWenxiu' && f.hp > 0);
   if (!e || !attacker || attacker.hp <= 0 || battle.over) return;
   const who = attacker.isPlayer ? '你' : attacker.name;
+  const defenderHadEvaBuff = !!attacker.taiyiEvaBuff;
+  const defenderHadYuxuShield = (Number(attacker.yuxuShield) || 0) > 0;
   addLog(`【云斟夕露】以云为盏，与夕作露，她立于实地，足尖却好似在云雾之中翩然起舞，${who}一击未中，反遭其连刺数下。`, 'crit');
 
   const own = fighterAttackValue(e, 'sword');
   const against = fighterDefenseValue(attacker, 'sword');
   let dmg = (20 + own + (own - against / 2) * 2.5) * 1.25 * 2 * 3;
   dmg = Math.max(0, dmg - fighterDR(attacker));
+  const yiji = typeof resolveAttackYiji === 'function' ? resolveAttackYiji(e, attacker) : { triggered: false, mult: 1 };
+  if (yiji.triggered) dmg *= yiji.mult;
+  if (Number(e.damageDealtMult) > 0) dmg *= Number(e.damageDealtMult);
+  if (Number(attacker.damageTakenMult) > 0) dmg *= Number(attacker.damageTakenMult);
+  const xiejin = typeof resolveAttackXiejin === 'function' ? resolveAttackXiejin(attacker, e) : { triggered: false, reduce: 0 };
+  let xiejinCut = 0;
+  if (xiejin.triggered && dmg > 0) {
+    xiejinCut = Math.min(dmg, xiejin.reduce);
+    dmg = Math.max(0, dmg - xiejinCut);
+  }
   dmg = Math.round(dmg * 10) / 10;
 
-  attacker.hp -= dmg;
-  addLog(`【反击】${e.name} 剑光连闪，对${who}造成 ${fmtNum(dmg)} 点伤害（必定命中，3段）`, 'dmg');
+  const res = typeof applyDamageToFighter === 'function'
+    ? applyDamageToFighter(attacker, dmg)
+    : (() => { attacker.hp -= dmg; return { applied: dmg, yuxuAbsorbed: 0 }; })();
+  const notes = ['必定命中', '3段'];
+  if (yiji.triggered) notes.push(`一击制敌 ×${yiji.mult.toFixed(2)}`);
+  if (xiejinCut > 0) notes.push(`卸劲归元减免 ${fmtNum(Math.round(xiejinCut * 10) / 10)} 点`);
+  if (res.yuxuAbsorbed > 0) notes.push(`先天罡气抵消 ${fmtNum(Math.round(res.yuxuAbsorbed * 10) / 10)} 点`);
+  addLog(`【反击】${e.name} 剑光连闪，对${who}造成 ${fmtNum(Math.round(res.applied * 10) / 10)} 点伤害（${notes.join('，')}）`, 'dmg');
   shakeCard(attacker);
+  if (typeof applyCompleteAttackDefenseReactions === 'function') {
+    applyCompleteAttackDefenseReactions({ attacker: e, defender: attacker, defenderHadEvaBuff, defenderHadYuxuShield, hitSegments: 1, missSegments: 0 });
+  }
   if (attacker.hp <= 0) {
     attacker.hp = 0;
     addLog(`${who} 倒下了！`, 'dmg');
   }
   if (!battle.over) checkBattleEnd();
+}
+
+/* ================= 京城西巷剧情战：青城弟子 / 青城壮汉 / 道渺渺 ================= */
+const WEST_ALLEY_SKILL_DEFS = {
+  taiyi: { id: 'taiyi', name: '太乙伏魔剑', type: '剑法', select: '招式' },
+  lingxu: { id: 'lingxu', name: '凌虚步', type: '轻功', select: '轻功' },
+  yuxu: { id: 'yuxu', name: '玉虚功', type: '内功', select: '内功' }
+};
+
+function grantWestAlleySkill(skillId) {
+  const def = WEST_ALLEY_SKILL_DEFS[skillId];
+  if (!def) return false;
+  if (!Array.isArray(player.skills)) player.skills = [];
+  const existed = player.skills.some(s => s && s.id === def.id);
+  if (!existed) {
+    player.skills.push({ id: def.id, name: def.name, type: def.type, level: 1, exp: 0, jianweizhizhuBase: 0, studyMinutes: 0 });
+    if (player.trainingSelections && typeof player.trainingSelections === 'object' && !player.trainingSelections[def.select]) {
+      player.trainingSelections[def.select] = def.id;
+    }
+    addIntel(`你学会了${def.type}【${def.name}】。`, 'good');
+    showToast(`你学会了《${def.name}》`);
+  }
+  updateAttrUI();
+  updateNeiLiDisplays();
+  renderSkills();
+  updateTrainingUI();
+  saveGame();
+  return !existed;
+}
+
+function completeShishuStage(spared) {
+  storyFlags.qingchengShishuDefeated = true;
+  storyFlags.shishuSpared = !!spared;
+  grantWestAlleySkill('lingxu');
+  if (spared) {
+    player.bondDaoMiaomiao = (Number(player.bondDaoMiaomiao) || 0) + 20;
+    addIntel(`你放过了青城壮汉。（道渺渺好感 +20，当前 ${Math.round(player.bondDaoMiaomiao)}）`, 'good');
+  }
+  updateCapitalNpcs();
+  renderIntel();
+  saveGame();
+}
+
+function makeWestAlleyNpcEnemy(spec) {
+  const taiyiLv = Math.max(0, Number(spec.taiyiLevel) || 0);
+  const lingxuLv = Math.max(0, Number(spec.lingxuLevel) || 0);
+  const yuxuLv = Math.max(0, Number(spec.yuxuLevel) || 0);
+
+  const root = Number(spec.root) || 0;
+  const comp = Number(spec.comp) || 0;
+  const luck = Number(spec.luck) || 0;
+  const neiLi = Number(spec.neiLi) || 0;
+
+  const con = (Number(spec.con) || 0) + yuxuLv * 20;
+  const sword = (Number(spec.sword) || 0) + taiyiLv * 30;
+  const fist = Number(spec.fist) || 0;
+  const blade = Number(spec.blade) || 0;
+  const changbing = Number(spec.changbing) || 0;
+  const qimen = Number(spec.qimen) || 0;
+  const hidden = Number(spec.hidden) || 0;
+  const maxMartial = Math.max(fist, blade, sword, changbing, qimen, hidden);
+
+  const speed = (Number(spec.speed) || 0)
+    + lingxuLv * 0.07 + (lingxuLv >= 10 ? 0.3 : 0) + (lingxuLv >= 30 ? 1 : 0);
+  const accuracy = (Number(spec.accuracy) || 0)
+    + taiyiLv * 0.01 + lingxuLv * 0.03 + (yuxuLv >= 100 ? 1 : 0);
+  const evasion = (Number(spec.evasion) || 0)
+    + lingxuLv * 0.025 + (lingxuLv >= 10 ? 0.1 : 0) + (lingxuLv >= 30 ? 0.3 : 0) + (yuxuLv >= 100 ? 1 : 0);
+
+  const yijiPoints = maxMartial / 10 + taiyiLv + (taiyiLv >= 10 ? 10 : 0) + (taiyiLv >= 35 ? 20 : 0);
+  const xushiPoints = comp * 0.5 + lingxuLv + (lingxuLv >= 10 ? 10 : 0) + (lingxuLv >= 30 ? 30 : 0);
+  const mianmianPoints = root * 0.5 + yuxuLv;
+  const xiejinPoints = neiLi / 100 + yuxuLv;
+
+  const taiyiSt = typeof getTaiyiStats === 'function' ? getTaiyiStats(taiyiLv) : { hits: 7, multiplier: 0.25 };
+  const yuxuShieldAmt = typeof getYuxuShieldAmount === 'function' ? getYuxuShieldAmount(neiLi, yuxuLv) : 0;
+  const maxHp = Math.round(80 + con * 20);
+
+  return {
+    name: spec.name,
+    npcId: spec.npcId,
+    hp: maxHp,
+    maxHp,
+    atk: 0,
+    speed,
+    con,
+    neiLi,
+    fist,
+    blade,
+    sword,
+    changbing,
+    qimen,
+    hidden,
+    medicine: Number(spec.medicine) || 0,
+    poison: Number(spec.poison) || 0,
+    accuracy,
+    evasion,
+    root,
+    comp,
+    luck,
+    yijiPoints,
+    xushiPoints,
+    mianmianPoints,
+    xiejinPoints,
+    taiyiLevel: taiyiLv,
+    taiyiLayers: taiyiLv >= 100 ? TAIYI_MAX_LAYERS : 0,
+    taiyiEvaBuff: taiyiLv >= 100,
+    taiyiJianqiBuff: 0,
+    lingxuLevel: lingxuLv,
+    lingxuFirstDodge: lingxuLv >= 10,
+    lingxuRegenNextAt: 0,
+    fengxuLayers: lingxuLv >= 100 ? 3 : 0,
+    yuxuLevel: yuxuLv,
+    yuxuShield: yuxuShieldAmt,
+    yuxuMaxShield: yuxuShieldAmt,
+    damageDealtMult: yuxuLv >= 100 ? 1.5 : 1,
+    damageTakenMult: yuxuLv >= 100 ? 0.7 : 1,
+    zhuXieBiYi: !!spec.zhuXieBiYi,
+    lastZhuXieAt: 0,
+    attack: { name: '太乙伏魔剑', multiplier: taiyiSt.multiplier, hits: taiyiSt.hits, stat: 'sword' },
+    skills: [
+      `太乙伏魔剑（${levelToChinese(taiyiLv)}重）`,
+      `凌虚步（${levelToChinese(lingxuLv)}重）`,
+      `玉虚功（${levelToChinese(yuxuLv)}重）`
+    ].concat(spec.zhuXieBiYi ? ['诸邪辟易'] : []),
+    memory: {},
+    confused: false,
+    isSpar: true
+  };
+}
+
+function makeQingchengDiziEnemy() {
+  return makeWestAlleyNpcEnemy({
+    npcId: 'qingchengDizi',
+    name: '青城弟子',
+    root: 70, comp: 70, luck: 70, con: 100, neiLi: 2500,
+    fist: 150, blade: 150, sword: 150, changbing: 150, qimen: 150, hidden: 150,
+    medicine: 200, poison: 100,
+    speed: 0.5, accuracy: 1.05, evasion: 0.30,
+    taiyiLevel: 12, lingxuLevel: 12, yuxuLevel: 7
+  });
+}
+
+function makeQingchengZhuanghanEnemy() {
+  return makeWestAlleyNpcEnemy({
+    npcId: 'qingchengZhuanghan',
+    name: '青城壮汉',
+    root: 130, comp: 100, luck: 100, con: 500, neiLi: 7500,
+    fist: 250, blade: 250, sword: 250, changbing: 250, qimen: 250, hidden: 250,
+    medicine: 550, poison: 200,
+    speed: 1, accuracy: 1.25, evasion: 0.50,
+    taiyiLevel: 17, lingxuLevel: 15, yuxuLevel: 15
+  });
+}
+
+function makeDaoMiaomiaoEnemy() {
+  return makeWestAlleyNpcEnemy({
+    npcId: 'daoMiaomiao',
+    name: '道渺渺',
+    root: 220, comp: 220, luck: 220, con: 1200, neiLi: 20000,
+    fist: 500, blade: 500, sword: 500, changbing: 500, qimen: 500, hidden: 500,
+    medicine: 1000, poison: 300,
+    speed: 2.5, accuracy: 2.0, evasion: 1.0,
+    taiyiLevel: 50, lingxuLevel: 50, yuxuLevel: 50,
+    zhuXieBiYi: true
+  });
+}
+
+function startWestAlleyStoryBattle(kind) {
+  if (battleActive()) {
+    showToast('正在战斗中，先分出胜负吧');
+    return;
+  }
+  let enemy = null;
+  let introLog = '';
+  if (kind === 'qingchengDizi') {
+    enemy = makeQingchengDiziEnemy();
+    introLog = '【青城弟子】“喂喂喂？！你谁啊！干嘛上来就打？！”';
+  } else if (kind === 'qingchengZhuanghan') {
+    enemy = makeQingchengZhuanghanEnemy();
+    introLog = '【青城壮汉】“废话少说，看拳！”';
+  } else if (kind === 'daoMiaomiao') {
+    enemy = makeDaoMiaomiaoEnemy();
+    introLog = '【道渺渺】“小友，请出招吧。”';
+  }
+  if (!enemy) return;
+
+  prepareStoryBattle();
+  battle.enemies = sealFighters('enemy', [enemy]);
+  battle.allies = buildAllyTeam(null, false);
+  battle.storyBattleId = kind;
+  battle.whiteRobe = null;
+  if (typeof initBattleEvents === 'function') initBattleEvents('');
+  initBattleStrategy();
+  const forfeitBtn = $('battleForfeitBtn');
+  if (forfeitBtn) forfeitBtn.textContent = '放 弃 战 斗';
+  const pauseBtn = $('battlePauseBtn');
+  if (pauseBtn) pauseBtn.textContent = '暂 停 战 斗';
+  if (introLog) addLog(introLog, '');
+  renderBattleStructure();
+  updateBattleUI();
+  mainView = 'village';
+  renderMainTab();
+  switchTab('battle');
+  battleRunning = true;
+  startBattleEngine();
 }
 
 let storyBattleEndTimer = null;
@@ -1973,6 +2290,7 @@ function clearStoryBattleEndTimer() {
 
 function completeStoryBattleEnd(id, result) {
   clearStoryBattleEndTimer();
+  const wasForfeited = !!battle.forfeited;
   battle.storyBattleId = '';
   const whiteRobeWin = id === 'whiteRobe' && result === 'win';
   battle.whiteRobe = null;
@@ -1991,6 +2309,42 @@ function completeStoryBattleEnd(id, result) {
   if (id === 'peiWenxiu') {
     storyFlags.peiSparDone = true;
     showDialogNode(result === 'win' ? 'peiSparWin' : 'peiSparLose');
+  } else if (id === 'qingchengDizi') {
+    if (result === 'win') {
+      storyFlags.qingchengDiziDefeated = true;
+      grantWestAlleySkill('taiyi');
+      updateCapitalNpcs();
+      showDialogNode('qingchengDiziWin');
+    } else {
+      showDialogNode('qingchengDiziLose');
+    }
+  } else if (id === 'qingchengZhuanghan') {
+    if (result === 'win') {
+      showDialogNode('shishuWin');
+    } else {
+      showDialogNode('shishuLose');
+    }
+  } else if (id === 'daoMiaomiao') {
+    storyFlags.daoMiaomiaoFought = true;
+    storyFlags.yuxuFirstGranted = false;
+    if (result === 'win') {
+      storyFlags.daoMiaomiaoDefeated = true;
+      if (!storyFlags.yuxuObtained) {
+        storyFlags.yuxuObtained = true;
+        storyFlags.yuxuFirstGranted = true;
+        grantWestAlleySkill('yuxu');
+      }
+      updateCapitalNpcs();
+      showDialogNode('laoShishuWin');
+    } else if (!wasForfeited && !storyFlags.yuxuObtained) {
+      storyFlags.yuxuObtained = true;
+      storyFlags.yuxuFirstGranted = true;
+      grantWestAlleySkill('yuxu');
+      updateCapitalNpcs();
+      showDialogNode('laoShishuLoseFirst');
+    } else {
+      showDialogNode('laoShishuLoseRepeat');
+    }
   } else if (whiteRobeWin) {
     showDialogNode('baiYiVictory');
   } else {
@@ -2023,7 +2377,7 @@ function getBondExtraMartialStats() {
   const b = ensureBondChar();
   const extra = {
     fist: 0, sword: 0, blade: 0, changbing: 0, qimen: 0, hidden: 0,
-    neili: 0, con: 0, root: 0, comp: 0, luck: 0, speed: 0, conMult: 1
+    neili: 0, con: 0, root: 0, comp: 0, luck: 0, speed: 0, accuracy: 0, evasion: 0, conMult: 1
   };
   const mine = Array.isArray(player.skills) ? player.skills : [];
 
@@ -2052,6 +2406,17 @@ function getBondExtraMartialStats() {
       if (typeof getPaodingDaoSpeedBonus === 'function') extra.speed += getPaodingDaoSpeedBonus(lv);
       return;
     }
+    if (id === 'taiyi') {
+      extra.sword += lv * 30;
+      extra.accuracy += lv * 0.01;
+      return;
+    }
+    if (id === 'lingxu') {
+      extra.speed += lv * 0.07 + (lv >= 10 ? 0.3 : 0) + (lv >= 30 ? 1 : 0);
+      extra.accuracy += lv * 0.03;
+      extra.evasion += lv * 0.025 + (lv >= 10 ? 0.1 : 0) + (lv >= 30 ? 0.3 : 0);
+      return;
+    }
     if (id === 'qiangshen') {
       extra.con += 2 + lv * 2 + (lv >= 10 ? 10 : 0) + (lv >= 30 ? 100 : 0) + (lv > 50 ? (lv - 50) * 2 : 0);
       if (typeof getQiangshenRootBonus === 'function') extra.root += getQiangshenRootBonus(lv);
@@ -2060,6 +2425,11 @@ function getBondExtraMartialStats() {
     }
     if (id === 'huomai') {
       extra.root += Math.floor(lv / 5);
+      return;
+    }
+    if (id === 'yuxu') {
+      extra.con += lv * 20;
+      if (lv >= 100) { extra.accuracy += 1; extra.evasion += 1; }
       return;
     }
 
@@ -2688,6 +3058,10 @@ function updateAttrUI() {
   if (comboEl) comboEl.textContent = formatPercent(getMianmianRate());
   const critEl = $('a-crit');
   if (critEl) critEl.textContent = formatPercent(getXushiRate());
+  const yijiEl = $('a-yiji');
+  if (yijiEl && typeof getYijiRate === 'function') yijiEl.textContent = formatPercent(getYijiRate());
+  const xiejinEl = $('a-xiejin');
+  if (xiejinEl && typeof getXiejinRate === 'function') xiejinEl.textContent = formatPercent(getXiejinRate());
   const bondEl = $('a-bond');
   if (bondEl) bondEl.textContent = fmtBondStat(getBondValue());
 
@@ -2837,6 +3211,7 @@ function loadGame() {
     if (typeof player.bondXiaPuying !== 'number') player.bondXiaPuying = 50;
     if (!Number.isFinite(Number(player.bondXiaPuying)) || Number(player.bondXiaPuying) <= 0) player.bondXiaPuying = 50;
     if (!Number.isFinite(Number(player.bondPeiWenxiu)) || Number(player.bondPeiWenxiu) < 0) player.bondPeiWenxiu = 0;
+    if (!Number.isFinite(Number(player.bondDaoMiaomiao)) || Number(player.bondDaoMiaomiao) < 0) player.bondDaoMiaomiao = 0;
     if (typeof player.companionId !== 'string' || !player.companionId) player.companionId = BOND_SPAR_ID;
     if (typeof player.hidden !== 'number' || !Number.isFinite(player.hidden)) player.hidden = 0;
     if (typeof player.changbing !== 'number' || !Number.isFinite(player.changbing)) player.changbing = 0;
@@ -3048,6 +3423,14 @@ function resetGame() {
     storyFlags.arrivedCapital = false;
     storyFlags.capitalPeiTalkDone = false;
     storyFlags.farmUnlocked = false;
+    storyFlags.qingchengDiziDefeated = false;
+    storyFlags.qingchengShishuRan = false;
+    storyFlags.qingchengShishuDefeated = false;
+    storyFlags.shishuSpared = false;
+    storyFlags.daoMiaomiaoFought = false;
+    storyFlags.daoMiaomiaoDefeated = false;
+    storyFlags.yuxuObtained = false;
+    storyFlags.yuxuFirstGranted = false;
     storyFlags.farewellTiezhu = false;
     storyFlags.farewellShip = false;
     storyFlags.farewellDaifu = false;
@@ -3062,6 +3445,7 @@ function resetGame() {
     closeArriveModal();
     player.bondXiaPuying = 50;
     player.bondPeiWenxiu = 0;
+    player.bondDaoMiaomiao = 0;
     player.companionId = BOND_SPAR_ID;
     player.fist = 0;
     player.blade = 0;
@@ -3592,6 +3976,14 @@ $('startBtn').addEventListener('click', () => {
   storyFlags.arrivedCapital = false;
   storyFlags.capitalPeiTalkDone = false;
   storyFlags.farmUnlocked = false;
+  storyFlags.qingchengDiziDefeated = false;
+  storyFlags.qingchengShishuRan = false;
+  storyFlags.qingchengShishuDefeated = false;
+  storyFlags.shishuSpared = false;
+  storyFlags.daoMiaomiaoFought = false;
+  storyFlags.daoMiaomiaoDefeated = false;
+  storyFlags.yuxuObtained = false;
+  storyFlags.yuxuFirstGranted = false;
   storyFlags.farewellTiezhu = false;
   storyFlags.farewellShip = false;
   storyFlags.farewellDaifu = false;
@@ -3646,6 +4038,7 @@ $('startBtn').addEventListener('click', () => {
   player.techniques = [];
   player.bondXiaPuying = 50;
   player.bondPeiWenxiu = 0;
+  player.bondDaoMiaomiao = 0;
   player.companionId = BOND_SPAR_ID;
   player.bond = { neiLi: 0, levels: { qingyuan: 9, feishipo: 7, tanafa: 7 }, lastCultAt: Date.now(), lastGrowthAt: Date.now() };
   player.strategy = defaultStrategy();

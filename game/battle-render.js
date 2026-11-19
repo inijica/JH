@@ -48,10 +48,11 @@ function fmtBattleSpeed(v) {
 
 /* 基础属性行：数值节点带 data-fd，供 updateFighterCard 实时刷新 */
 function fighterDetailHtml(f) {
+  const accVal = typeof fighterAccuracy === 'function' ? fighterAccuracy(f) : (f.accuracy || 0);
   return [
     `<span>体魄 <b data-fd="con">${fmtBattleInt(f.con)}</b></span>`,
     `<span>内力 <b data-fd="neili">${fmtBattleInt(fighterNeiLi(f))}</b></span>`,
-    `<span>命中 <b data-fd="acc">${fmtBattlePct(f.accuracy || 0)}</b></span>`,
+    `<span>命中 <b data-fd="acc">${fmtBattlePct(accVal)}</b></span>`,
     `<span>闪避 <b data-fd="eva">${fmtBattlePct(fighterEvasion(f))}</b></span>`,
     `<span>行动速度 <b data-fd="spd">${fmtBattleSpeed(f.speed)}</b></span>`
   ].join('');
@@ -133,6 +134,30 @@ function fighterStateNotes(f) {
   if (f.wujiuStacks !== undefined && Number(f.wujiuStacks) > 0) {
     notes.push(`无咎 ${f.wujiuStacks} 层`);
   }
+  if (f.taiyiLayers !== undefined && Number(f.taiyiLayers) > 0) {
+    notes.push(`太乙 ${f.taiyiLayers} 层`);
+  }
+  if (f.taiyiJianqiBuff !== undefined && Number(f.taiyiJianqiBuff) > 0) {
+    notes.push(`太乙剑气（${f.taiyiJianqiBuff}层）`);
+  }
+  if (f.taiyiEvaBuff) {
+    notes.push('遁影（+100%闪避）');
+  }
+  if (f.lingxuFirstDodge) {
+    notes.push('凌虚（必闪首次攻势）');
+  }
+  if (f.fengxuLayers !== undefined && Number(f.fengxuLayers) > 0) {
+    notes.push(`冯虚御风 ${f.fengxuLayers} 层`);
+  }
+  if (f.yuxuShield !== undefined && Number(f.yuxuShield) > 0) {
+    notes.push(`先天罡气（护盾 ${fmtNum(Math.round(f.yuxuShield))}）`);
+  }
+  if (Number(f.yuxuLevel) >= 100) {
+    notes.push('归真');
+  }
+  if (f.zhuXieBiYi) {
+    notes.push('诸邪辟易');
+  }
   if (f.confused) notes.push('混乱');
   if (f.vulnerable) notes.push('破防');
   if (f.qizhi) notes.push('气滞（行动速度 -0.1）');
@@ -148,9 +173,10 @@ function updateFighterCard(f) {
     const n = el.querySelector(`[data-fd="${key}"]`);
     if (n) n.textContent = val;
   };
+  const accVal = typeof fighterAccuracy === 'function' ? fighterAccuracy(f) : (f.accuracy || 0);
   setFd('con', fmtBattleInt(f.con));
   setFd('neili', fmtBattleInt(fighterNeiLi(f)));
-  setFd('acc', fmtBattlePct(f.accuracy || 0));
+  setFd('acc', fmtBattlePct(accVal));
   setFd('eva', fmtBattlePct(fighterEvasion(f)));
   setFd('spd', fmtBattleSpeed(f.speed));
 

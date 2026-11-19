@@ -12,7 +12,7 @@ function findItemInsertIndex(id, data) {
   const inv = player.inventory;
   const def = ITEM_DEFS[id];
   if (!def) return inv.length;
-  const name = ((id === 'kaoyu' || id === 'shucaiDunyu') && data && data.name) ? data.name : def.name;
+  const name = ((id === 'kaoyu' || id === 'shucaiDunyu' || id === 'shuizhuShucai') && data && data.name) ? data.name : def.name;
   for (let i = inv.length - 1; i >= 0; i--) {
     const s = inv[i];
     if (!s) continue;
@@ -75,7 +75,7 @@ function removeItemAt(idx, qty = 1) {
 
 function getItemDisplayName(slot) {
   const def = ITEM_DEFS[slot.id];
-  if ((slot.id === 'kaoyu' || slot.id === 'shucaiDunyu') && slot.data && slot.data.name) return slot.data.name;
+  if ((slot.id === 'kaoyu' || slot.id === 'shucaiDunyu' || slot.id === 'shuizhuShucai') && slot.data && slot.data.name) return slot.data.name;
   return def ? def.name : '?';
 }
 
@@ -92,6 +92,14 @@ function getBagItemDesc(slot) {
       : (Number(slot.data.weight) || 0) * (eff ? eff.legacyPerWeight || 0 : 0) * (Number(slot.data.effectMult) || 1);
     const valStr = eff && eff.stat === 'qinggongExp' ? Math.round(gain).toString() : gain.toFixed(4);
     return `以${fishDef ? fishDef.name : '鱼'}烤制而成。食用后${eff ? eff.label : '属性'} +${valStr}`;
+  }
+  if (slot.id === 'shuizhuShucai' && slot.data) {
+    const vegDef = ITEM_DEFS[slot.data.vegId];
+    const eff = VEG_EFFECTS[slot.data.vegId];
+    const gain = typeof getBoiledVegGain === 'function'
+      ? getBoiledVegGain(slot.data)
+      : (eff ? eff.baseValue * (Number(slot.data.effectMult) || 1) : 0);
+    return `以${vegDef ? vegDef.name : '蔬菜'}水煮而成。食用后${eff ? eff.label : '属性'} +${gain.toFixed(4)}`;
   }
   if (slot.id === 'shucaiDunyu' && slot.data) {
     const fishDef = ITEM_DEFS[slot.data.fishId];
@@ -144,7 +152,7 @@ function renderBag() {
     const def = ITEM_DEFS[slot.id];
     if (!def) return '';
     let sub;
-    if ((slot.id === 'kaoyu' || slot.id === 'shucaiDunyu') && slot.data) {
+    if ((slot.id === 'kaoyu' || slot.id === 'shucaiDunyu' || slot.id === 'shuizhuShucai') && slot.data) {
       sub = `品质 ${Math.round(slot.data.quality || 0)}`;
     } else if (slot.data && slot.data.weight != null) {
       sub = `${Number(slot.data.weight).toFixed(2)} s` +
@@ -182,7 +190,7 @@ function openBagItem(idx) {
 
   const displayName = getItemDisplayName(slot);
   let wTxt = '';
-  if ((slot.id === 'kaoyu' || slot.id === 'shucaiDunyu') && slot.data) {
+  if ((slot.id === 'kaoyu' || slot.id === 'shucaiDunyu' || slot.id === 'shuizhuShucai') && slot.data) {
     wTxt = `　品质 ${Math.round(Number(slot.data.quality) || 0)}`;
   } else if (slot.data && (slot.data.weight != null || slot.data.quality != null)) {
     const parts = [];

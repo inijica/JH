@@ -1043,5 +1043,127 @@ ${storyFlags.farewellDaifuJinzhen ? '（定力 +1，医术 +20，学会了特技
 你问起裴文秀，她也只是莞尔一笑，避而不答。
 这样的日子过了几天，你却是有些不习惯，便决定去城里转转。`,
     options: []
+  },
+
+  /* ================= 京城西巷 · 青城三战 ================= */
+  qingchengDiziIntro: {
+    speaker: '旁 白',
+    text: () => `青城弟子，走在街上用鼻孔看人，牛气哄哄的，要不要揍他一顿？`,
+    options: [
+      { label: '揍他丫的', action: 'qingchengDiziBattle' },
+      { label: '离开', action: 'leave' }
+    ]
+  },
+  qingchengDiziWin: {
+    speaker: '青城弟子',
+    text: () => `“可恶！有本事你别跑！我去叫我师叔来！”
+他狼狈地逃走，你原本打算追上去再揍他一顿，却见他身上掉下来一本秘籍，你捡起来一瞧，竟是《太乙伏魔剑》。
+回过神来时，已经不见那人身影。
+（提示：你学会了《太乙伏魔剑》）`,
+    options: []
+  },
+  qingchengDiziLose: {
+    speaker: '青城弟子',
+    text: () => `“哼！看你还敢不敢欺负我们青城弟子！”`,
+    options: []
+  },
+
+  shishuIntro: {
+    speaker: '青城壮汉',
+    text: () => `你面前站着个魁梧的壮汉，仿佛有两层楼那么高，身上的道袍都快被撑破了。
+他怒气冲冲地瞪着你，看起来凶神恶煞的，完全没有修道之人的样子。
+“喂，小不点，就是你欺负我们青城山的人？”
+“什么废话也不用说，今天你必须给我一个交代！”`,
+    options: [
+      { label: '谁怕谁！', action: 'qingchengZhuanghanBattle' },
+      { label: '逃跑！', next: 'shishuRun', onSelect: () => { storyFlags.qingchengShishuRan = true; saveGame(); } }
+    ]
+  },
+  shishuRun: {
+    speaker: '青城壮汉',
+    text: () => `“靠！有本事欺负人，有本事别跑啊！”
+壮汉看着你逃窜的背影叫骂着，好在他并没有追上来。`,
+    options: []
+  },
+  shishuRetry: {
+    speaker: '青城壮汉',
+    text: () => `“哟呵，你还敢回来？”`,
+    options: [
+      { label: '揍他丫的！', action: 'qingchengZhuanghanBattle' },
+      { label: '逃跑！', next: 'shishuRun', onSelect: () => { storyFlags.qingchengShishuRan = true; saveGame(); } }
+    ]
+  },
+  shishuWin: {
+    speaker: '青城壮汉',
+    text: () => `“我擦！这么能打？！......等等，别打了别打了，我错了！我认输！”
+你把魁梧壮汉按在地上，正准备再给他来上几拳，他却是干脆利落地求起饶来。`,
+    options: [
+      { label: '继续揍他', next: 'shishuWinHit', onSelect: () => completeShishuStage(false) },
+      { label: '放他一马', next: 'shishuWinSpare', onSelect: () => completeShishuStage(true) }
+    ]
+  },
+  shishuWinHit: {
+    speaker: '旁 白',
+    text: () => `你毫不客气地又给了他几记老拳，揍得他鼻青脸肿、抱头鼠窜而去。
+临走前他手忙脚乱地掉下一卷步法秘籍，你拾起来翻看，原来是青城绝学《凌虚步》。
+（提示：你学会了《凌虚步》）`,
+    options: []
+  },
+  shishuWinSpare: {
+    speaker: '旁 白',
+    text: () => `你松开手，摆了摆袖子示意他赶紧滚蛋。
+壮汉如蒙大赦，连声道谢之余，竟从怀里摸出一卷步法秘籍塞到你手中，说权当赔罪，随即一溜烟没了影。
+你定睛一瞧，正是青城身法《凌虚步》。
+（提示：你学会了《凌虚步》）
+（道渺渺好感 +20）`,
+    options: []
+  },
+  shishuLose: {
+    speaker: '青城壮汉',
+    text: () => `“哼！知道青城山的厉害了吧！下回再敢欺负我师侄，见你一次揍你一次！”`,
+    options: []
+  },
+
+  laoShishuIntro: {
+    speaker: '道 渺 渺',
+    text: () => `先前那壮汉灰溜溜离开后，巷口却又静静立了一名清癯道人，须发微白，气韵如渊。
+${storyFlags.shishuSpared ? '“贫道道渺渺。方才听闻门下顽徒对你有所冒犯，承蒙小友手下留情，未曾下狠手。”' : '“贫道道渺渺。门下小辈学艺不精、骄纵失礼，让小友见笑了。”'}
+他负手望了你片刻，眸中忽起一丝兴味：
+“小友竟已通晓《太乙伏魔剑》与《凌虚步》之理，倒与我青城颇有几分缘法。可愿接贫道几招，让我瞧瞧你的火候？”`,
+    options: [
+      { label: '请老师叔赐教！', action: 'daoMiaomiaoBattle' },
+      { label: '改日再来', action: 'leave' }
+    ]
+  },
+  laoShishuRematch: {
+    speaker: '道 渺 渺',
+    text: () => `道渺渺正于巷畔闭目养神，见你走近，微微笑道：
+“小友修行如何了？可要再与贫道过上几招？”`,
+    options: [
+      { label: '再请赐教！', action: 'daoMiaomiaoBattle' },
+      { label: '离开', action: 'leave' }
+    ]
+  },
+  laoShishuWin: {
+    speaker: '道 渺 渺',
+    text: () => `道渺渺收剑而立，长笑一声，眼中满是赞赏：
+“好！好一个后生可畏！贫道多年未曾如此痛快地与人交手了！”
+${storyFlags.yuxuFirstGranted ? '他自袖中取出一册青玉装帧的道经递给你：“既能破我青城剑步，这门青城至高内功《玉虚功》，合该赠予小友参详。”\n（提示：你学会了《玉虚功》）' : '“小友进境神速，假以时日必成武林大器。”'}`,
+    options: []
+  },
+  laoShishuLoseFirst: {
+    speaker: '道 渺 渺',
+    text: () => `道渺渺虚按一掌，敛去周身清气，将你缓缓扶起。
+“小友根基已稳，剑步亦颇具灵性，只是内息流转尚欠火候，难破我青城诸邪辟易之境。”
+他沉吟片刻，竟自袖中取出一册道经递到你手中：
+“难得遇见你这般可造之材，这门《玉虚功》便赠与你。好好打磨内息，来日再与贫道一较高下。”
+（提示：你学会了《玉虚功》）`,
+    options: []
+  },
+  laoShishuLoseRepeat: {
+    speaker: '道 渺 渺',
+    text: () => `道渺渺收手而立，温和笑道：
+“内力之道贵在积蓄，切莫操之过急。回去再多加参悟《玉虚功》，贫道随时在此候教。”`,
+    options: []
   }
 };

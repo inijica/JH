@@ -48,12 +48,28 @@ function ensureBondStrategy() {
   return player.bondStrategy;
 }
 
+function isPlayerSkillEquipped(skillId) {
+  if (!skillId || !Array.isArray(player.skills) || !player.skills.some(x => x && x.id === skillId)) return false;
+  const s = ensureStrategy();
+  const defStyle = typeof getPlayerAttackStyle === 'function'
+    ? getPlayerAttackStyle()
+    : ((player.trainingSelections || {})['招式'] || 'zhenshan');
+  if (!s.enabled) return defStyle === skillId;
+  const inRounds = (s.rounds || []).some(r => r && r.skillId === skillId && r.maxUses !== 0);
+  const inLow = s.lowHp && s.lowHp.skillId === skillId;
+  const inAllyLow = s.allyLowHp && s.allyLowHp.skillId === skillId;
+  if (inRounds || inLow || inAllyLow) return true;
+  const hasInfiniteRound = (s.rounds || []).some(r => r && r.skillId && r.maxUses === -1);
+  return !hasInfiniteRound && defStyle === skillId;
+}
+
 function getBattleSkillOptions() {
   const opts = [];
   if (player.skills.some(x => x.id === 'zhenshan')) opts.push({ id: 'zhenshan', name: '震山拳' });
   if (player.skills.some(x => x.id === 'feishipo')) opts.push({ id: 'feishipo', name: '飞石破' });
   if (player.skills.some(x => x.id === 'jiusi')) opts.push({ id: 'jiusi', name: '九思剑法' });
   if (player.skills.some(x => x.id === 'paodingDao')) opts.push({ id: 'paodingDao', name: '庖丁刀法' });
+  if (player.skills.some(x => x.id === 'taiyi')) opts.push({ id: 'taiyi', name: '太乙伏魔剑' });
   if (typeof hasJinzhenTechnique === 'function' && hasJinzhenTechnique()) {
     opts.push({ id: 'jinzhen', name: '金针渡穴' });
   }
@@ -68,6 +84,7 @@ function getBondBattleSkillOptions() {
   if ((Number(levels.feishipo) || 0) > 0) opts.push({ id: 'feishipo', name: '飞石破' });
   if ((Number(levels.jiusi) || 0) > 0) opts.push({ id: 'jiusi', name: '九思剑法' });
   if ((Number(levels.paodingDao) || 0) > 0) opts.push({ id: 'paodingDao', name: '庖丁刀法' });
+  if ((Number(levels.taiyi) || 0) > 0) opts.push({ id: 'taiyi', name: '太乙伏魔剑' });
   return opts;
 }
 
@@ -109,6 +126,11 @@ function tryLowHpStrategy() {
   if (sid === 'paodingDao' && hasPaodingDao()) {
     addLog('【战斗策略】自身气血过低，立刻施展庖丁刀法！', 'crit');
     doPaodingDaoAttack();
+    return true;
+  }
+  if (sid === 'taiyi' && getTaiyiLevel() > 0) {
+    addLog('【战斗策略】自身气血过低，立刻施展太乙伏魔剑！', 'crit');
+    doTaiyiAttack();
     return true;
   }
   if (sid === 'jinzhen' && typeof hasJinzhenTechnique === 'function' && hasJinzhenTechnique()) {
@@ -157,6 +179,11 @@ function tryAllyLowHpStrategy() {
   if (sid === 'paodingDao' && hasPaodingDao()) {
     addLog(`【战斗策略】同伴${targetAlly.name}气血过低，立刻施展庖丁刀法！`, 'crit');
     doPaodingDaoAttack();
+    return true;
+  }
+  if (sid === 'taiyi' && getTaiyiLevel() > 0) {
+    addLog(`【战斗策略】同伴${targetAlly.name}气血过低，立刻施展太乙伏魔剑！`, 'crit');
+    doTaiyiAttack();
     return true;
   }
   return false;

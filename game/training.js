@@ -4,10 +4,13 @@ const SKILL_REQUIREMENTS = {
   jiusi: { '悟性': 4, '剑法': 7, '内力': 30 },
   feishipo: { '暗器': 9 },
   paodingDao: { '刀法': 9, '悟性': 3 },
+  taiyi: { '剑法': 120, '定力': 50, '悟性': 50, '内力': 3000 },
+  lingxu: { '悟性': 90, '定力': 70, '内力': 3000 },
   qiangshen: { '体魄': 8, '根骨': 6 },
   tanafa: { '内力': 15, '体魄': 4 },
   qingyuan: { '悟性': 8, '内力': 50 },
-  huomai: { '内力': 100, '医术': 25 }
+  huomai: { '内力': 100, '医术': 25 },
+  yuxu: { '悟性': 120, '定力': 120, '内力': 10000 }
 };
 const SKILL_TYPES = ['招式','轻功','外功','内功'];
 
@@ -21,11 +24,14 @@ const SKILL_DIFFICULTY = {
   zhenshan: 1.10,
   jiusi: 1.20,
   feishipo: 1.15,
-  paodingDao: 1.05,
+  paodingDao: 1.10,
+  taiyi: 2.10,
+  lingxu: 2.10,
   qiangshen: 1.25,
   tanafa: 1.25,
   qingyuan: 1.30,
-  huomai: 1.35
+  huomai: 1.35,
+  yuxu: 2.65
 };
 const SKILL_DEFAULT_DIFFICULTY = 1.00;
 

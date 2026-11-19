@@ -185,15 +185,22 @@ function resumeOfflineCooking(cookingInfo) {
   if (typeof storyFlags !== 'undefined' && storyFlags.leftVillage && !storyFlags.arrivedCapital) return;
   if (typeof cookingState === 'undefined' || typeof COOK_RECIPES === 'undefined') return;
   const items = cookingInfo.pending
-    .map(it => ({
-      recipe: (it && it.recipe === 'shucaiDunyu') || cookingInfo.recipe === 'shucaiDunyu' ? 'shucaiDunyu' : '',
-      fishId: it && it.fishId,
-      weight: Number(it && it.weight) || 0,
-      fishQuality: it && it.fishQuality != null && Number.isFinite(Number(it.fishQuality)) ? Number(it.fishQuality) : null,
-      vegId: it && it.vegId && typeof ITEM_DEFS !== 'undefined' && ITEM_DEFS[it.vegId] ? it.vegId : '',
-      vegQuality: it && it.vegQuality != null && Number.isFinite(Number(it.vegQuality)) ? Number(it.vegQuality) : 100
-    }))
-    .filter(it => typeof ITEM_DEFS !== 'undefined' && ITEM_DEFS[it.fishId] && (it.recipe !== 'shucaiDunyu' || ITEM_DEFS[it.vegId]));
+    .map(it => {
+      const rec = (it && it.recipe) || cookingInfo.recipe || '';
+      return {
+        recipe: (rec === 'shucaiDunyu' || rec === 'shuizhuShucai') ? rec : '',
+        fishId: it && it.fishId,
+        weight: Number(it && it.weight) || 0,
+        fishQuality: it && it.fishQuality != null && Number.isFinite(Number(it.fishQuality)) ? Number(it.fishQuality) : null,
+        vegId: it && it.vegId && typeof ITEM_DEFS !== 'undefined' && ITEM_DEFS[it.vegId] ? it.vegId : '',
+        vegQuality: it && it.vegQuality != null && Number.isFinite(Number(it.vegQuality)) ? Number(it.vegQuality) : 100
+      };
+    })
+    .filter(it => {
+      if (typeof ITEM_DEFS === 'undefined') return false;
+      if (it.recipe === 'shuizhuShucai') return !!ITEM_DEFS[it.vegId];
+      return !!ITEM_DEFS[it.fishId] && (it.recipe !== 'shucaiDunyu' || !!ITEM_DEFS[it.vegId]);
+    });
   if (!items.length) return;
   cookingState.recipe = COOK_RECIPES[cookingInfo.recipe] ? cookingInfo.recipe : 'kaoyu';
   cookingState.pending = items;

@@ -11,14 +11,13 @@ function getTanafaLevel() {
   return s ? s.level : 0;
 }
 
-/* 淬火呼吸法内力增速的基准值：首重 0.008/分钟，每重 +0.004，二十重起 ×2 */
-const TANAFA_RATE_BASE = 0.004;
+/* 淬火呼吸法内力增速：只计算每重内力增速（0.002/分钟/重），二十重起 ×2 */
 const TANAFA_RATE_PER_LEVEL = 0.002;
 const TANAFA_RATE_DOUBLE_LEVEL = 20;
 
 function calcNeiLiRate(level, luck) {
   if (!(Number(level) > 0)) return 0;
-  let perMin = TANAFA_RATE_BASE + (Number(level) - 1) * TANAFA_RATE_PER_LEVEL;
+  let perMin = Number(level) * TANAFA_RATE_PER_LEVEL;
   if (Number(level) >= TANAFA_RATE_DOUBLE_LEVEL) perMin *= 2;
   perMin *= 1 + Math.max(0, Number(luck) || 0) * 0.025;
   return perMin;
@@ -29,7 +28,7 @@ function getTanafaRatePerMin() {
   const level = getTanafaLevel();
   if (level <= 0) return 0;
   const mult = getPerLayerMult(getMartialSkillById('tanafa'));
-  let perMin = TANAFA_RATE_BASE + (level - 1) * TANAFA_RATE_PER_LEVEL * mult;
+  let perMin = level * TANAFA_RATE_PER_LEVEL * mult;
   if (level >= TANAFA_RATE_DOUBLE_LEVEL) perMin *= 2;
   perMin *= getNeiLiSpeedMultiplier();
   return perMin;
@@ -38,7 +37,6 @@ function getTanafaRatePerMin() {
 /* ================= 医术 / 活脉养络法 ================= */
 
 const HUOMAI_ID = 'huomai';
-const HUOMAI_RATE_BASE = 0.01;
 const HUOMAI_RATE_PER_LEVEL = 0.005;
 const HUOMAI_UNLOCKS = [
   { level: 5,   desc: '战斗开始及每 5 秒获得一层【活脉】，每层提供医术/50 的每秒生命恢复' },
@@ -69,7 +67,7 @@ function getTotalPoison() {
 function getHuomaiRatePerMin(level = getHuomaiLevel()) {
   if (level <= 0) return 0;
   const mult = getPerLayerMult(getMartialSkillById('huomai'));
-  return (HUOMAI_RATE_BASE + (level - 1) * HUOMAI_RATE_PER_LEVEL * mult) * getNeiLiSpeedMultiplier();
+  return (level * HUOMAI_RATE_PER_LEVEL * mult) * getNeiLiSpeedMultiplier();
 }
 /* 活脉叠层间隔（秒） */
 function getHuomaiLayerInterval(level = getHuomaiLevel()) {
@@ -89,8 +87,51 @@ function getHuomaiSpeedPerLayer(level = getHuomaiLevel(), medicine) {
   return m / 100000;
 }
 
+/* ================= 玉虚功 ================= */
+
+const YUXU_ID = 'yuxu';
+const YUXU_RATE_PER_LEVEL = 0.1;
+const YUXU_UNLOCKS = [
+  { level: 10,  desc: '进入战斗时获得【先天罡气】：生成相当于自身内力×1 的护盾，护盾存在期间减伤提高（内力 × 根骨 / 500）' },
+  { level: 30,  desc: '护盾存在期间每次受到完整攻击时，反弹敌方（自身内力×1 + 根骨×10）点固定伤害' },
+  { level: 50,  desc: '护盾存在期间每次受到完整攻击时，自身行动条 +30%' },
+  { level: 70,  desc: '【先天罡气】护盾上限提升至 内力 ×（1 + 玉虚功重数 / 100）' },
+  { level: 100, desc: '命中率 +100%，闪避率 +100%；获得【归真】：造成伤害 +50%，受到伤害 -30%，每秒恢复 2% 最大气血' }
+];
+
+function getYuxuSkill() {
+  return (player.skills || []).find(s => s && s.id === YUXU_ID) || null;
+}
+function getYuxuLevel() {
+  const s = getYuxuSkill();
+  return s ? Math.max(0, Number(s.level) || 0) : 0;
+}
+function getYuxuConBonus(level = getYuxuLevel()) {
+  if (level <= 0) return 0;
+  return level * 20 * getPerLayerMult(getMartialSkillById('yuxu'));
+}
+function getYuxuXiejinBonus(level = getYuxuLevel()) {
+  if (level <= 0) return 0;
+  return level * 1 * getPerLayerMult(getMartialSkillById('yuxu'));
+}
+function getYuxuMianmianBonus(level = getYuxuLevel()) {
+  if (level <= 0) return 0;
+  return level * 1 * getPerLayerMult(getMartialSkillById('yuxu'));
+}
+function getYuxuRatePerMin(level = getYuxuLevel()) {
+  if (level <= 0) return 0;
+  const mult = getPerLayerMult(getMartialSkillById('yuxu'));
+  return (level * YUXU_RATE_PER_LEVEL * mult) * getNeiLiSpeedMultiplier();
+}
+function getYuxuShieldAmount(neiLi, level = getYuxuLevel()) {
+  if (level < 10) return 0;
+  const nl = Math.max(0, Number(neiLi) || 0);
+  const mult = level >= 70 ? (1 + level / 100) : 1;
+  return nl * mult;
+}
+
 function getNeiLiRatePerMin() {
-  return getTanafaRatePerMin() + getHuomaiRatePerMin();
+  return getTanafaRatePerMin() + getHuomaiRatePerMin() + getYuxuRatePerMin();
 }
 function getNeiLiRatePerSec() { return getNeiLiRatePerMin() / 60; }
 
@@ -133,6 +174,8 @@ function updateNeiLiDisplays() {
   }
   const shenningEl = $('a-shenning');
   if (shenningEl) shenningEl.textContent = formatPercent(getShenningRate());
+  const xiejinEl = $('a-xiejin');
+  if (xiejinEl && typeof getXiejinRate === 'function') xiejinEl.textContent = formatPercent(getXiejinRate());
 }
 
 setInterval(() => {

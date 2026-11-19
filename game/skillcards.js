@@ -14,13 +14,14 @@ function skillCardShell(s, bodyRows, unlockHtml) {
   const need = getSkillExpNeed(lv, s);
   const difficulty = getSkillDifficulty(s);
   const difficultyRate = getSkillDifficultyMultiplier(s);
+  const attrLabel = (s && (s.type === '外功' || s.type === '内功')) ? '根骨修炼加成' : '悟性修炼加成';
   return `<div class="skill-card">
     <div class="skill-card-name">${s.name}（${levelToChinese(lv)}重）</div>
     <div class="skill-card-row">升级经验：<b>${Math.floor(s.exp || 0)} / ${Math.floor(need)}</b></div>
     <div class="skill-card-row">难度系数：<b>${difficulty.toFixed(2)}</b>　经验需求倍率：<b>×${difficultyRate.toFixed(2)}</b></div>
     <div class="skill-card-row">见微知著：<b>${fmtBondStat(getJwzzTotal(s))}</b>　修炼要求减免：<b>${formatPercent(getJwzzRequirementReduction(s))}</b></div>
     <div class="skill-exp"><div class="skill-exp-fill" style="width:${Math.min(100, (s.exp || 0) / need * 100)}%"></div></div>
-    <div class="skill-train-meta">根骨/悟性修炼加成：${formatPercent(getSkillAttributeBonus(s))}　修炼效率：${formatPercent(getSkillTrainingEfficiency(s))}</div>
+    <div class="skill-train-meta">${attrLabel}：${formatPercent(getSkillAttributeBonus(s))}　修炼效率：${formatPercent(getSkillTrainingEfficiency(s))}</div>
     <div class="skill-requirement">修炼要求：${getRequirementDetails(s)}</div>
     ${bodyRows}
     <div class="skill-unlocks">
@@ -43,7 +44,7 @@ const SKILL_CARD_BUILDERS = {
       <div class="skill-card-row">伤害次数：<b>${st.hits}</b></div>
       <div class="skill-card-row">伤害倍率：<b>${st.multiplier}</b></div>
       <div class="skill-card-row">【撼山势】：施展后叠加 1 层，上限 <b>${HANSHAN_MAX_LAYERS}</b> 层${lv >= 100 ? '；战斗中每秒自动叠加 1 层' : ''}</div>
-      <div class="skill-card-row">每层使攻击附加 <b>${HANSHAN_CON_PER_LAYER}×体魄</b> 的基础伤害（计入攻防计算）${lv >= 100 ? `，百重翻倍为 <b>${fmtBondStat(HANSHAN_CON_PER_LAYER * 2)}×体魄</b>` : ''}</div>
+      <div class="skill-card-row">每层使震山拳附加 <b>${HANSHAN_CON_PER_LAYER}×体魄</b> 的基础伤害（计入攻防计算）${lv >= 100 ? `，百重翻倍为 <b>${fmtBondStat(HANSHAN_CON_PER_LAYER * 2)}×体魄</b>` : ''}</div>
       <div class="skill-card-row">当前每层附加：<b>${fmtNum(Math.round(perLayer * 100) / 100)}</b>　满层附加：<b>${fmtNum(Math.round(perLayer * HANSHAN_MAX_LAYERS * 10) / 10)}</b></div>`;
     return { rows, unlockHtml: renderUnlockList(WANGBA_UNLOCKS, lv) };
   },
@@ -61,8 +62,8 @@ const SKILL_CARD_BUILDERS = {
       <div class="skill-card-row">当前剑法：<b>${fmtBondStat(getTotalSword())}</b></div>
       <div class="skill-card-row">【思退】：每次使用后叠 1 层，上限 <b>${JIUSI_SITUI_MAX}</b> 层，每层闪避 <b>+${Math.round(JIUSI_SITUI_EVA * 100)}%</b></div>
       <div class="skill-card-row">【思进】：【思退】满 <b>${JIUSI_SITUI_MAX}</b> 层后触发，九思剑法伤害 <b>+45%</b>，反击伤害 <b>+100%</b></div>
-      ${lv >= 20 ? `<div class="skill-card-row">【思退·反击】：满 ${JIUSI_SITUI_MAX} 层时，闪避后以九思剑法反击（闪避几段则反击几段）</div>` : ''}
-      ${lv >= 100 ? `<div class="skill-card-row">【先手】：进入战斗时立刻使用三次九思剑法</div>` : ''}`;
+      ${lv >= 20 ? `<div class="skill-card-row">【思退·反击】：满 ${JIUSI_SITUI_MAX} 层时，闪避后以九思剑法反击</div>` : ''}
+      ${lv >= 100 ? `<div class="skill-card-row">【先手】：进入战斗时立刻使用七次九思剑法</div>` : ''}`;
     return { rows, unlockHtml: renderUnlockList(JIUSI_UNLOCKS, lv) };
   },
 
@@ -80,9 +81,27 @@ const SKILL_CARD_BUILDERS = {
       <div class="skill-card-row">伤害倍率：<b>${st.multiplier}</b></div>
       <div class="skill-card-row">当前刀法：<b>${fmtBondStat(getTotalBlade())}</b></div>
       <div class="skill-card-row">【庖丁】：伤害提升 <b>${pd}%</b>，修炼效率提升 <b>${pd}%</b></div>
-      <div class="skill-card-row">【游刃】：伤害忽视敌人防御；每次命中叠 1 层，每层每段伤害 <b>+${fmtNum(Math.round(youren * 100) / 100)}</b>（最小 1${lv >= 100 ? '，百重翻倍' : ''}）</div>
+      <div class="skill-card-row">【游刃】：伤害忽视敌人防御；每次命中叠 1 层，每层每段伤害 <b>+${fmtNum(Math.round(youren * 100) / 100)}</b>（最小 2${lv >= 100 ? '，百重翻倍' : ''}）</div>
       ${getPaodingDaoAccuracyBonus(lv) > 0 ? `<div class="skill-card-row">命中率加成：<b>+${Math.round(getPaodingDaoAccuracyBonus(lv) * 100)}%</b></div>` : ''}`;
     return { rows, unlockHtml: renderUnlockList(PAODINGDAO_UNLOCKS, lv) };
+  },
+
+  taiyi: (s, lv) => {
+    const st = getTaiyiStats(lv);
+    const tyMult = getPerLayerMult(getMartialSkillById('taiyi'));
+    const perSword = fmtBondStat(30 * tyMult);
+    const perAcc = fmtRate(1 * tyMult);
+    const perYiji = fmtBondStat(1 * tyMult);
+    const rows = `
+      <div class="skill-card-row">类型：<b>${s.type}</b></div>
+      <div class="skill-card-intro">青城派伏魔剑阵化繁为简而成的一路剑法，剑出七星连环，后劲绵长。</div>
+      <div class="skill-card-row">每一重提升：剑法+${perSword}、命中率+${perAcc}%、一击制敌+${perYiji}</div>
+      <div class="skill-card-row">伤害次数：<b>${st.hits}</b>　伤害倍率：<b>${st.multiplier}</b></div>
+      <div class="skill-card-row">当前加成：剑法 <b>+${fmtBondStat(getTaiyiSwordBonus(lv))}</b>　命中率 <b>+${fmtRate(getTaiyiAccuracyBonus(lv) * 100)}%</b>　一击制敌 <b>+${fmtBondStat(getTaiyiYijiBonus(lv))}</b></div>
+      ${lv >= 10 ? `<div class="skill-card-row">【太乙】：上限 <b>${TAIYI_MAX_LAYERS}</b> 层，每层命中率 <b>+${Math.round(TAIYI_STACK_ACC * 100)}%</b>、闪避率 <b>+${Math.round(TAIYI_STACK_EVA * 100)}%</b></div>` : ''}
+      ${lv >= 25 ? `<div class="skill-card-row">【太乙剑气】：消耗全部【太乙】后，下次剑法命中额外造成消耗层数次 0.1 倍率剑法伤害</div>` : ''}
+      ${lv >= 35 ? `<div class="skill-card-row">【遁影】：获得【太乙】时附加，下次受击闪避率 <b>+100%</b></div>` : ''}`;
+    return { rows, unlockHtml: renderUnlockList(TAIYI_UNLOCKS, lv) };
   },
 
   feishipo: (s, lv) => {
@@ -122,7 +141,6 @@ const SKILL_CARD_BUILDERS = {
     const rows = `
       <div class="skill-card-row">类型：<b>${s.type}</b></div>
       <div class="skill-card-intro">以针理脉，以脉养气。血行无碍，气自生焉。</div>
-      <div class="skill-card-row">首重内力增速：<b>${rowRate(HUOMAI_RATE_BASE)}/分钟</b></div>
       <div class="skill-card-row">每一重提升：内力增速 <b>+${rowRate(hmPerLevelRate)}/分钟</b>、医术 <b>+${fmtBondStat(perLevelMed)}</b></div>
       <div class="skill-card-row">每五重提升：根骨 <b>+${fmtBondStat(perFiveRoot)}</b></div>
       <div class="skill-card-row">当前内力增速：<b>${rowRate(getHuomaiRatePerMin(lv))}/分钟</b>　当前医术：<b>${fmtBondStat(getTotalMedicine())}</b></div>
@@ -131,7 +149,6 @@ const SKILL_CARD_BUILDERS = {
   },
 
   tanafa: (s, lv) => {
-    const base = TANAFA_RATE_BASE;
     const dbl = TANAFA_RATE_DOUBLE_LEVEL;
     const rowRate = (v) => (v >= 0.1 ? fmtRate(v) : v.toFixed(4).replace(/0+$/, '').replace(/\.$/, ''));
     const tfMult = getPerLayerMult(getMartialSkillById('tanafa'));
@@ -139,11 +156,27 @@ const SKILL_CARD_BUILDERS = {
     const rows = `
       <div class="skill-card-row">类型：<b>${s.type}</b></div>
       <div class="skill-card-intro">依淬火之机调理呼吸，一呼一吸间如冷水入炉。日久天长，内力自生。</div>
-      <div class="skill-card-row">首重内力增速：<b>${rowRate(base)}/分钟</b></div>
       <div class="skill-card-row">每一重提升：内力增速 <b>+${rowRate(perLevel)}/分钟</b>（${dbl} 重起翻倍）</div>
       <div class="skill-card-row">定力内力速度加成：<b>${formatPercent(getNeiLiSpeedMultiplier() - 1)}</b></div>
       <div class="skill-card-row">当前内力增速：<b>${rowRate(getTanafaRatePerMin())}/分钟</b></div>`;
     return { rows, unlockHtml: renderUnlockList(TANAFA_UNLOCKS, lv) };
+  },
+
+  yuxu: (s, lv) => {
+    const rowRate = (v) => (v >= 0.1 ? fmtRate(v) : v.toFixed(4).replace(/0+$/, '').replace(/\.$/, ''));
+    const yxMult = getPerLayerMult(getMartialSkillById('yuxu'));
+    const perCon = fmtBondStat(20 * yxMult);
+    const perRate = YUXU_RATE_PER_LEVEL * yxMult;
+    const perXiejin = fmtBondStat(1 * yxMult);
+    const perMian = fmtBondStat(1 * yxMult);
+    const rows = `
+      <div class="skill-card-row">类型：<b>${s.type}</b></div>
+      <div class="skill-card-intro">青城镇派内功心法，气清如玉虚云表，守御如山岳难撼。</div>
+      <div class="skill-card-row">每一重提升：体魄 <b>+${perCon}</b>、内力增速 <b>+${rowRate(perRate)}/分钟</b>、卸劲归元 <b>+${perXiejin}</b>、延绵不绝 <b>+${perMian}</b></div>
+      <div class="skill-card-row">当前内力增速：<b>${rowRate(getYuxuRatePerMin(lv))}/分钟</b>　体魄加成：<b>+${fmtBondStat(getYuxuConBonus(lv))}</b></div>
+      <div class="skill-card-row">当前加成：卸劲归元 <b>+${fmtBondStat(getYuxuXiejinBonus(lv))}</b>　延绵不绝 <b>+${fmtBondStat(getYuxuMianmianBonus(lv))}</b></div>
+      ${lv >= 10 ? `<div class="skill-card-row">【先天罡气】：开场生成 <b>${fmtNum(Math.round(getYuxuShieldAmount(getTotalNeiLi(), lv)))}</b> 点护盾</div>` : ''}`;
+    return { rows, unlockHtml: renderUnlockList(YUXU_UNLOCKS, lv) };
   },
 
   qingyuan: (s, lv) => {
@@ -160,6 +193,20 @@ const SKILL_CARD_BUILDERS = {
       <div class="skill-card-row">每一重提升：行动速度 +${fmtRate(perSpd)}、命中率 +${fmtRate(perAcc * 100)}%、闪避率 +${fmtRate(perEva * 100)}%</div>
       <div class="skill-card-row">当前加成：行动速度 <b>+${fmtRate(spd)}</b>　命中率 <b>+${fmtRate(acc * 100)}%</b>　闪避率 <b>+${fmtRate(eva * 100)}%</b></div>`;
     return { rows, unlockHtml: renderUnlockList(QINGYUAN_UNLOCKS, lv) };
+  },
+
+  lingxu: (s, lv) => {
+    const lxMult = getPerLayerMult(getMartialSkillById('lingxu'));
+    const perSpd = 0.07 * lxMult;
+    const perAcc = 0.03 * lxMult;
+    const perEva = 0.025 * lxMult;
+    const perXushi = 1 * lxMult;
+    const rows = `
+      <div class="skill-card-row">类型：<b>${s.type}</b></div>
+      <div class="skill-card-intro">青城派独门轻功，步履踏风而起，身形如飘然乘云，令人捉摸不定。</div>
+      <div class="skill-card-row">每一重提升：行动速度 +${fmtRate(perSpd)}、命中率 +${fmtRate(perAcc * 100)}%、闪避率 +${fmtRate(perEva * 100)}%、虚实莫测 +${fmtBondStat(perXushi)}</div>
+      <div class="skill-card-row">当前加成：行动速度 <b>+${fmtRate(getLingxuSpeedBonus(lv))}</b>　命中率 <b>+${fmtRate(getLingxuAccuracyBonus(lv) * 100)}%</b>　闪避率 <b>+${fmtRate(getLingxuEvasionBonus(lv) * 100)}%</b>　虚实莫测 <b>+${fmtBondStat(getLingxuXushiBonus(lv))}</b></div>`;
+    return { rows, unlockHtml: renderUnlockList(LINGXU_UNLOCKS, lv) };
   }
 };
 
@@ -341,7 +388,7 @@ function buildFishingTechniqueCard() {
     <div class="skill-card-row">升级经验：<b>${Math.round(skill.exp || 0)} / ${Math.round(need)}</b></div>
     <div class="skill-exp"><div class="skill-exp-fill" style="width:${Math.min(100, (skill.exp || 0) / need * 100)}%"></div></div>
     <div class="skill-train-meta">每级提升：钓鱼品质提升，钓鱼时间缩短　每2级定力 +1</div>
-    <div class="skill-card-row">经验倍率：<b>×${getFishingExpMultiplier().toFixed(2)}</b></div>
+    <div class="skill-card-row">定力修炼加成：<b>${formatPercent(getFishingExpMultiplier())}</b></div>
     <div class="skill-card-row">当前双倍产出概率：<b>${formatPercent(dblChance)}</b></div>
     <div class="skill-card-row">当前钓鱼时间：<b>${(getFishingDuration()/1000).toFixed(2)} 秒</b></div>
     <div class="skill-unlocks"><div class="unlock-title">突 破 节 点</div>${unlockHtml}</div>
@@ -367,7 +414,7 @@ function buildPaodingTechniqueCard() {
     <div class="skill-card-row">升级经验：<b>${Math.round(skill.exp || 0)} / ${Math.round(need)}</b></div>
     <div class="skill-exp"><div class="skill-exp-fill" style="width:${Math.min(100, (skill.exp || 0) / need * 100)}%"></div></div>
     <div class="skill-train-meta">每级提升：刀法 +1，烹饪品质提升　每2级悟性 +1</div>
-    <div class="skill-card-row">经验倍率：<b>×${getPaodingExpMultiplier().toFixed(2)}</b></div>
+    <div class="skill-card-row">悟性修炼加成：<b>${formatPercent(getPaodingExpMultiplier())}</b></div>
     <div class="skill-card-row">当前双倍产出概率：<b>${formatPercent(getPaodingDoubleChance())}</b></div>
     <div class="skill-unlocks"><div class="unlock-title">突 破 节 点</div>${unlockHtml}</div>
   </div>`;
@@ -397,8 +444,7 @@ function buildFarmerTechniqueCard() {
     <div class="skill-card-row">升级经验：<b>${Math.round(skill.exp || 0)} / ${Math.round(need)}</b></div>
     <div class="skill-exp"><div class="skill-exp-fill" style="width:${Math.min(100, (skill.exp || 0) / need * 100)}%"></div></div>
     <div class="skill-train-meta">每级提升：收获品质提升，收获速度 +2%，收获时间减少　每2级根骨 +1</div>
-    <div class="skill-card-row">经验倍率：<b>×${getFarmerExpMultiplier().toFixed(2)}</b></div>
-    <div class="skill-card-row">当前收获品质：<b>${getFarmerQuality(lv)}%</b></div>
+    <div class="skill-card-row">根骨修炼加成：<b>${formatPercent(getFarmerExpMultiplier())}</b></div>
     <div class="skill-card-row">当前双倍产出概率：<b>${formatPercent(getFarmerDoubleChance(lv))}</b></div>
     <div class="skill-card-row">当前收获时间：<b>${durLabel}</b></div>
     ${lv >= 125 ? `<div class="skill-card-row">【勤耕不辍】：见微知著获取速度 <b>+${fmtBondStat(getFarmerQinGengBonus(lv))}%</b></div>` : ''}

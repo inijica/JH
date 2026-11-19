@@ -50,7 +50,7 @@ const WANGBA_UNLOCKS = [
   { level: 10,  desc: '伤害倍率提升至 0.135 倍，额外提升 10 体魄' },
   { level: 20,  desc: '伤害次数提升至 5 次，额外提升 30 体魄、3 根骨' },
   { level: 50,  desc: '伤害次数提升至 7，倍率提升至 0.18 倍，额外提升 200 体魄、15 根骨' },
-  { level: 100, desc: '拳法+1000，体魄+1500；【撼山势】提供的增伤翻倍；战斗开始自动叠加 20 层【撼山势】，且每秒自动叠加 1 层' }
+  { level: 100, desc: '拳法+1000，体魄+1500；【撼山势】提供的增伤翻倍；战斗开始自动叠加 20 层【撼山势】，且每秒自动叠加 1 层（（仅装备时生效））' }
 ];
 
 function getWangbaLevel() {
@@ -107,9 +107,9 @@ function getTotalQimen() { return Number(player.qimen) || 0; }
 const JIUSI_UNLOCKS = [
   { level: 5,   desc: '悟性+1，剑法+10' },
   { level: 10,  desc: '剑法+20，内力+5，伤害倍率提升至 0.07 倍' },
-  { level: 20,  desc: '悟性+2，神宁气静+3，伤害倍率提升至 0.1 倍；【思退】满九层时，闪避后用九思剑法反击（闪避几段反击几段）' },
+  { level: 20,  desc: '悟性+2，神宁气静+3，伤害倍率提升至 0.1 倍；【思退】满九层时，闪避后用九思剑法反击' },
   { level: 50,  desc: '悟性+5，剑法+50，内力+100，伤害倍率提升至 0.13 倍，伤害次数提升至 6 次' },
-  { level: 100, desc: '悟性+20，神宁气静+10，剑法+1000，内力+2500；进入战斗时立刻使用三次九思剑法' }
+  { level: 100, desc: '悟性+20，神宁气静+10，剑法+1000，内力+2500；进入战斗时立刻使用七次九思剑法（仅装备时生效）' }
 ];
 
 function getJiusiLevel() {
@@ -163,7 +163,7 @@ function getJiusiShenningBonus(level = getJiusiLevel()) {
 }
 
 function getTotalSword() {
-  return (Number(player.sword) || 0) + getJiusiSwordBonus();
+  return (Number(player.sword) || 0) + getJiusiSwordBonus() + getTaiyiSwordBonus();
 }
 
 /* 九思剑法伤害：剑法属性，【思进】在【思退】满 9 层后触发，九思剑法伤害 +45%，反击伤害 +100% */
@@ -176,6 +176,51 @@ function calcSwordDamage(multiplier, effectMultiplier, enemy, opts) {
   const isCounter = !!(opts && opts.isCounter);
   const siJin = siTuiFull ? (isCounter ? 2 : 1.45) : 1;
   return (20 + getTotalCon() + martialPart) * multiplier * effectMultiplier * 2 * siJin;
+}
+
+/* ========== 太乙伏魔剑 ========== */
+const TAIYI_MAX_LAYERS = 9;
+const TAIYI_STACK_ACC = 0.05;
+const TAIYI_STACK_EVA = 0.05;
+const TAIYI_UNLOCKS = [
+  { level: 10,  desc: '一击制敌 +10，伤害倍率提升至 0.25 倍；每次使用若全部被闪避，获得一层【太乙】（上限 9 层），每层命中率 +5%、闪避率 +5%' },
+  { level: 25,  desc: '伤害倍率提升至 0.35 倍；每次使用太乙伏魔剑若有命中，消耗所有【太乙】层数并获得【太乙剑气】：下一次剑法命中额外造成消耗层数次 0.1 倍率剑法伤害' },
+  { level: 35,  desc: '一击制敌 +20，伤害倍率提升至 0.5 倍；每获得一层【太乙】时，额外获得【遁影】（下次受击闪避率 +100%，闪避或受到攻击后消失）' },
+  { level: 70,  desc: '伤害倍率提升至 0.7 倍；每次使用太乙伏魔剑无论是否命中皆会获得一层【太乙】' },
+  { level: 100, desc: '进入战斗即获得 9 层【太乙】与【遁影】，且【太乙剑气】造成的额外剑法伤害翻倍' }
+];
+
+function getTaiyiLevel() {
+  const s = (player.skills || []).find(s => s && s.id === 'taiyi');
+  return s ? Math.max(0, Number(s.level) || 0) : 0;
+}
+function getTaiyiStats(level = getTaiyiLevel()) {
+  let multiplier = 0.2;
+  if (level >= 10) multiplier = 0.25;
+  if (level >= 25) multiplier = 0.35;
+  if (level >= 35) multiplier = 0.5;
+  if (level >= 70) multiplier = 0.7;
+  return { hits: 7, multiplier };
+}
+function getTaiyiSwordBonus(level = getTaiyiLevel()) {
+  if (level <= 0) return 0;
+  return level * 30 * getPerLayerMult(getMartialSkillById('taiyi'));
+}
+function getTaiyiAccuracyBonus(level = getTaiyiLevel()) {
+  if (level <= 0) return 0;
+  return level * 0.01 * getPerLayerMult(getMartialSkillById('taiyi'));
+}
+function getTaiyiYijiBonus(level = getTaiyiLevel()) {
+  if (level <= 0) return 0;
+  let bonus = level * 1 * getPerLayerMult(getMartialSkillById('taiyi'));
+  if (level >= 10) bonus += 10;
+  if (level >= 35) bonus += 20;
+  return bonus;
+}
+function calcTaiyiDamage(multiplier, effectMultiplier, enemy) {
+  const defMartial = getEnemyMaxMartial(enemy);
+  const martialPart = (getTotalSword() - defMartial / 2) * 2.5;
+  return (20 + getTotalCon() + martialPart) * multiplier * effectMultiplier * 2;
 }
 
 /* ========== 庖丁刀法 ========== */
@@ -271,9 +316,9 @@ function getPaodingDaoDamageMult(level = getPaodingDaoLevel()) {
   return 1 + getPaodingLevel() / 100;
 }
 
-/* 【游刃】每层每段固定伤害：庖丁等级/10（最小 1），一百重翻倍 */
+/* 【游刃】每层每段固定伤害：庖丁等级/5（最小 2），一百重翻倍 */
 function getPaodingDaoYourenPerLayer(level = getPaodingDaoLevel()) {
-  let v = Math.max(1, getPaodingLevel() / 10);
+  let v = Math.max(2, getPaodingLevel() / 5);
   if (level >= 100) v *= 2;
   return v;
 }
@@ -421,7 +466,8 @@ function getQiangshenConBonus(level) {
 function getTotalCon() {
   const qsLevel = getQiangshenLevel();
   const wbLevel = getWangbaLevel();
-  let base = player.constitution + getQiangshenConBonus(qsLevel) + getWangbaConBonus(wbLevel) + getFeishipoConBonus() + getPaodingDaoConBonus();
+  const yuxuCon = typeof getYuxuConBonus === 'function' ? getYuxuConBonus() : 0;
+  let base = player.constitution + getQiangshenConBonus(qsLevel) + getWangbaConBonus(wbLevel) + getFeishipoConBonus() + getPaodingDaoConBonus() + yuxuCon;
   if (qsLevel >= 100) base = base * 1.2;
   return base;
 }
@@ -465,18 +511,66 @@ function getQingyuanSpeedBonus(level = getQingyuanLevel()) {
   if (level >= 50) bonus += 0.25;
   return bonus;
 }
+
+/* ========== 凌虚步 ========== */
+const FENGXU_MAX_LAYERS = 7;
+const FENGXU_EVA_PER_LAYER = 0.10;
+const FENGXU_HP_REGEN_PCT = 0.01;
+const LINGXU_UNLOCKS = [
+  { level: 10,  desc: '行动速度 +0.3，闪避率 +10%，虚实莫测 +10；进入战斗获得【凌虚】，必定闪避敌方首次完整攻势' },
+  { level: 30,  desc: '行动速度 +1，闪避率 +30%，虚实莫测 +30' },
+  { level: 50,  desc: '获得【冯虚御风】：每次闪避完整攻势后叠加 1 层（上限 7 层），每层闪避率 +10%、每秒恢复 1% 最大气血' },
+  { level: 100, desc: '战斗开始即获得 3 层【冯虚御风】，且【凌虚】被破除后每 20 秒可重新凝结' }
+];
+
+function getLingxuSkill() {
+  return (player.skills || []).find(s => s && s.id === 'lingxu') || null;
+}
+function getLingxuLevel() {
+  const s = getLingxuSkill();
+  return s ? Math.max(0, Number(s.level) || 0) : 0;
+}
+function getLingxuSpeedBonus(level = getLingxuLevel()) {
+  if (level <= 0) return 0;
+  let bonus = level * 0.07 * getPerLayerMult(getMartialSkillById('lingxu'));
+  if (level >= 10) bonus += 0.3;
+  if (level >= 30) bonus += 1;
+  return bonus;
+}
+function getLingxuAccuracyBonus(level = getLingxuLevel()) {
+  if (level <= 0) return 0;
+  return level * 0.03 * getPerLayerMult(getMartialSkillById('lingxu'));
+}
+function getLingxuEvasionBonus(level = getLingxuLevel()) {
+  if (level <= 0) return 0;
+  let bonus = level * 0.025 * getPerLayerMult(getMartialSkillById('lingxu'));
+  if (level >= 10) bonus += 0.1;
+  if (level >= 30) bonus += 0.3;
+  return bonus;
+}
+function getLingxuXushiBonus(level = getLingxuLevel()) {
+  if (level <= 0) return 0;
+  let bonus = level * 1 * getPerLayerMult(getMartialSkillById('lingxu'));
+  if (level >= 10) bonus += 10;
+  if (level >= 30) bonus += 30;
+  return bonus;
+}
+
 function getTotalSpeed() {
   const mult = getPerLayerMult(getMartialSkillById('qingyuan'));
-  return (Number(player.speed) || 0.15) + getQingyuanLevel() * 0.02 * mult + getQingyuanSpeedBonus() + getPaodingDaoSpeedBonus();
+  return (Number(player.speed) || 0.15) + getQingyuanLevel() * 0.02 * mult + getQingyuanSpeedBonus() + getPaodingDaoSpeedBonus() + getLingxuSpeedBonus();
 }
 
 function getAccuracyRate() {
-  return 0.9 + getQingyuanLevel() * 0.0075 * getPerLayerMult(getMartialSkillById('qingyuan'));
+  const yuxuLv = typeof getYuxuLevel === 'function' ? getYuxuLevel() : 0;
+  return 0.9 + getQingyuanLevel() * 0.0075 * getPerLayerMult(getMartialSkillById('qingyuan')) + getTaiyiAccuracyBonus() + getLingxuAccuracyBonus() + (yuxuLv >= 100 ? 1 : 0);
 }
 
 function getEvasionRate() {
-  let rate = 0.10 + getQingyuanLevel() * 0.01 * getPerLayerMult(getMartialSkillById('qingyuan'));
+  const yuxuLv = typeof getYuxuLevel === 'function' ? getYuxuLevel() : 0;
+  let rate = 0.10 + getQingyuanLevel() * 0.01 * getPerLayerMult(getMartialSkillById('qingyuan')) + getLingxuEvasionBonus();
   if (getQingyuanLevel() >= 25) rate += 0.1;
+  if (yuxuLv >= 100) rate += 1;
   return Math.max(0, rate);
 }
 function hasQingyuanTrait() { return getQingyuanLevel() >= 100; }
@@ -502,16 +596,39 @@ function rollDodge(accuracy, evasion) {
 }
 
 function getMianmianPoints() {
-  return Math.max(0, getTotalRoot() * 0.5 + getPaodingDaoMianmianBonus());
+  const yuxuMianmian = typeof getYuxuMianmianBonus === 'function' ? getYuxuMianmianBonus() : 0;
+  return Math.max(0, getTotalRoot() * 0.5 + getPaodingDaoMianmianBonus() + yuxuMianmian);
 }
 
-/* 敌方对应的三项数值：虚实莫测=悟性×0.5，神宁气静=定力×0.5，延绵不绝=根骨×0.5 */
+function getEnemyMaxMartialAll(enemy) {
+  if (!enemy) return 0;
+  return Math.max(
+    Number(enemy.fist) || 0,
+    Number(enemy.blade) || 0,
+    Number(enemy.sword) || 0,
+    Number(enemy.changbing) || 0,
+    Number(enemy.qimen) || 0,
+    Number(enemy.hidden) || 0
+  );
+}
+
+/* 敌方对应的五项数值：虚实莫测=悟性×0.5，神宁气静=定力×0.5，延绵不绝=根骨×0.5，一击制敌=最高武学/10，卸劲归元=内力/100（若有显式武功加成字段则优先取） */
 function getEnemySkillValue(kind, e) {
   const en = e || firstLivingEnemy();
   if (!en) return 0;
-  if (kind === 'xushi') return Math.max(0, Number(en.comp) || 0) * 0.5;
-  if (kind === 'shenning') return Math.max(0, Number(en.luck) || 0) * 0.5;
-  return Math.max(0, Number(en.root) || 0) * 0.5;
+  if (kind === 'xushi') {
+    return en.xushiPoints != null ? Math.max(0, Number(en.xushiPoints) || 0) : Math.max(0, Number(en.comp) || 0) * 0.5;
+  }
+  if (kind === 'shenning') {
+    return en.shenningPoints != null ? Math.max(0, Number(en.shenningPoints) || 0) : Math.max(0, Number(en.luck) || 0) * 0.5;
+  }
+  if (kind === 'yiji') {
+    return en.yijiPoints != null ? Math.max(0, Number(en.yijiPoints) || 0) : Math.max(0, getEnemyMaxMartialAll(en) / 10);
+  }
+  if (kind === 'xiejin') {
+    return en.xiejinPoints != null ? Math.max(0, Number(en.xiejinPoints) || 0) : Math.max(0, (Number(en.neiLi) || 0) / 100);
+  }
+  return en.mianmianPoints != null ? Math.max(0, Number(en.mianmianPoints) || 0) : Math.max(0, Number(en.root) || 0) * 0.5;
 }
 
 function getMianmianRate(enemyValue = 0) {
@@ -531,7 +648,7 @@ function rollMianmianCount(rate) {
 }
 
 function getXushiPoints() {
-  return Math.max(0, getTotalComp() * 0.5 + getFeishipoXushiBonus() + getPaodingDaoXushiBonus());
+  return Math.max(0, getTotalComp() * 0.5 + getFeishipoXushiBonus() + getPaodingDaoXushiBonus() + getLingxuXushiBonus());
 }
 function getXushiRate(enemyValue = 0) {
   return Math.max(0, getXushiPoints() - (Number(enemyValue) || 0) / 2) * 0.01;
@@ -543,6 +660,28 @@ function getShenningPoints() {
 function getShenningRate(enemyValue = 0) {
   return Math.max(0, getShenningPoints() - (Number(enemyValue) || 0) / 2) * 0.01;
 }
+
+function getYijiPoints() {
+  return Math.max(0, getPlayerMartialMax() / 10 + getTaiyiYijiBonus());
+}
+function getYijiRate(enemyValue = 0) {
+  return Math.max(0, getYijiPoints() - (Number(enemyValue) || 0) / 2) * 0.01;
+}
+function getYijiBonusMult(points = getYijiPoints()) {
+  return 1 + (50 + Math.max(0, Number(points) || 0) / 5) / 100;
+}
+
+function getXiejinPoints() {
+  const yuxuXiejin = typeof getYuxuXiejinBonus === 'function' ? getYuxuXiejinBonus() : 0;
+  return Math.max(0, getTotalNeiLi() / 100 + yuxuXiejin);
+}
+function getXiejinRate(enemyValue = 0) {
+  return Math.max(0, getXiejinPoints() - (Number(enemyValue) || 0) / 2) * 0.01;
+}
+function getXiejinReduce(neiLi = getTotalNeiLi(), xiejinPoints = getXiejinPoints()) {
+  return Math.max(0, Number(neiLi) || 0) * (1 + Math.max(0, Number(xiejinPoints) || 0) / 50);
+}
+
 const MARTIAL_KEYS = ['fist', 'blade', 'sword', 'changbing', 'qimen'];
 const MARTIAL_LABELS = { fist: '拳掌', blade: '刀法', sword: '剑法', changbing: '长兵', qimen: '奇门', hidden: '暗器' };
 

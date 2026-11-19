@@ -53,6 +53,14 @@ function getCookedFishGain(data) {
   return eff.baseValue * mult;
 }
 
+function getBoiledVegGain(data) {
+  const d = data || {};
+  const eff = VEG_EFFECTS[d.vegId];
+  if (!eff) return 0;
+  const mult = Number(d.effectMult) || 1;
+  return getRawVegGain(d.vegId, { quality: d.vegQuality }) * mult;
+}
+
 function getStewedDishGains(data) {
   const d = data || {};
   const mult = Number(d.effectMult) || 1;
@@ -328,6 +336,17 @@ const ITEM_DEFS = {
       return grantFishEffect(d.fishId, gain, d.name || '烤鱼');
     }
   },
+  shuizhuShucai: {
+    name: '水煮蔬菜',
+    type: '菜',
+    desc: '清水汆烫煮熟的时蔬。',
+    usable: true,
+    use: (item) => {
+      const d = item.data || {};
+      const gain = getBoiledVegGain(d);
+      return grantVegEffect(d.vegId, gain, d.name || '水煮蔬菜');
+    }
+  },
   shucaiDunyu: {
     name: '蔬菜炖鱼',
     type: '菜',
@@ -392,6 +411,14 @@ const COOK_RECIPES = {
     name: '蔬菜炖鱼',
     desc: '鲜鱼与时蔬同锅细煨，二者滋味相融。额外获得 75% 庖丁经验。',
     reqDesc: '需求：鱼类 ×1，蔬菜 ×1',
+    stoveBonus: 5,
+    duration: 3000
+  },
+  shuizhuShucai: {
+    id: 'shuizhuShucai',
+    name: '水煮蔬菜',
+    desc: '将时蔬入沸水轻焯煮熟，清鲜爽口。',
+    reqDesc: '需求：蔬菜 ×1',
     stoveBonus: 5,
     duration: 3000
   }

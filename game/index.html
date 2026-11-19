@@ -226,7 +226,7 @@
           <div id="capitalMap" class="village-view" style="display:none">
             <div class="village-head">
               <div class="village-name">京 城</div>
-              <div class="village-intro">天子脚下，朱雀长街车水马龙，市井繁华却又暗流涌动。你们暂居于城中一隅，各自准备着接下来的风波。</div>
+              <div class="village-intro">天子脚下，朱雀长街车水马龙，市井繁华却又暗流涌动。你们暂居于城中一隅。</div>
             </div>
             <div class="place-list">
               <div class="place-card">
@@ -250,6 +250,19 @@
                 <div class="training-actions">
                   <button type="button" id="capitalFishingBtn">钓 鱼</button>
                 </div>
+              </div>
+              <div class="place-card" id="capitalWestAlley" style="display:none">
+                <div class="place-name">西 巷</div>
+                <div class="place-desc">朱雀街西侧的一条深巷，青石板路蜿蜒幽静，往来多是江湖客与三教九流，偶尔也能撞见些寻衅滋事的弟子门人。</div>
+                <div class="npc-row" id="westAlleyNpcs">
+                  <div class="npc-box" id="npcQingchengDizi" style="display:none">青 城 弟 子</div>
+                  <div class="npc-box" id="npcShishu" style="display:none">师 叔 ？</div>
+                  <div class="npc-box npc-master" id="npcLaoShishu" style="display:none">老 师 叔</div>
+                </div>
+              </div>
+              <div class="place-card" id="capitalTianjie" style="display:none">
+                <div class="place-name">天 街</div>
+                <div class="place-desc">京城最繁华的御道长街，酒肆茶楼林立，车马喧阗，锦衣侠客与达官显贵皆汇集于此。</div>
               </div>
             </div>
           </div>
@@ -301,6 +314,8 @@
           <div class="stat-line"><span class="name tooltip" data-tip="触发几率 =（我方延绵不绝 - 敌方根骨×0.5/2）%：触发后额外进行一次相同的行动，这次行动的效果只有原本的30%">延绵不绝</span><b id="a-combo">0%</b></div>
           <div class="stat-line"><span class="name tooltip" data-tip="触发几率 =（我方虚实莫测 - 敌方悟性×0.5/2）%：触发后本次攻击命中率提升50%，超过必中线的溢出命中转化为增伤">虚实莫测</span><b id="a-crit">0%</b></div>
           <div class="stat-line"><span class="name tooltip" data-tip="触发几率 =（我方神宁气静 - 敌方定力×0.5/2）%：触发后闪避率提升30%，额外进行一次闪避判定（取成功的一次，两次皆失败则判定为命中）">神宁气静</span><b id="a-shenning">0%</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="基础值为【最高武学数值/10】，触发几率 =（我方一击制敌 - 敌方一击制敌/2）%：触发后本次攻击伤害提升（50 + 一击制敌/5）%">一击制敌</span><b id="a-yiji">0%</b></div>
+          <div class="stat-line"><span class="name tooltip" data-tip="基础值为【内力/100】，触发几率 =（我方卸劲归元 - 敌方卸劲归元/2）%：触发后减免【内力 ×（1 + 卸劲归元/50）】点伤害">卸劲归元</span><b id="a-xiejin">0%</b></div>
           <div class="stat-line"><span class="name">行动速度</span><b id="a-speed">0.15</b></div>
           <div class="stat-line"><span class="name">夏扑萤羁绊</span><b id="a-bond">0</b></div>
 

@@ -141,6 +141,11 @@ function sortBattleSkillList(skills) {
 
 function buildPlayerFighter() {
   const huoLv = getHuomaiLevel();
+  const taiyiLv = typeof getTaiyiLevel === 'function' ? getTaiyiLevel() : 0;
+  const lingxuLv = typeof getLingxuLevel === 'function' ? getLingxuLevel() : 0;
+  const yuxuLv = typeof getYuxuLevel === 'function' ? getYuxuLevel() : 0;
+  const totalNei = getTotalNeiLi();
+  const yuxuShieldAmt = typeof getYuxuShieldAmount === 'function' ? getYuxuShieldAmount(totalNei, yuxuLv) : 0;
   const f = {
     uid: 'ally-player',
     id: 'player',
@@ -149,7 +154,7 @@ function buildPlayerFighter() {
     side: 'ally',
     speed: getTotalSpeed(),
     con: getTotalCon(),
-    neiLi: getTotalNeiLi(),
+    neiLi: totalNei,
     fist: getTotalFist(),
     blade: getTotalBlade(),
     sword: getTotalSword(),
@@ -171,7 +176,20 @@ function buildPlayerFighter() {
     bar: 0,
     hanShiLayers: 0,
     siTuiLayers: 0,
-    yourenLayers: 0
+    yourenLayers: 0,
+    taiyiLevel: taiyiLv,
+    taiyiLayers: taiyiLv >= 100 ? TAIYI_MAX_LAYERS : 0,
+    taiyiEvaBuff: taiyiLv >= 100,
+    taiyiJianqiBuff: 0,
+    lingxuLevel: lingxuLv,
+    lingxuFirstDodge: lingxuLv >= 10,
+    lingxuRegenNextAt: 0,
+    fengxuLayers: lingxuLv >= 100 ? 3 : 0,
+    yuxuLevel: yuxuLv,
+    yuxuShield: yuxuShieldAmt,
+    yuxuMaxShield: yuxuShieldAmt,
+    damageDealtMult: yuxuLv >= 100 ? 1.5 : 1,
+    damageTakenMult: yuxuLv >= 100 ? 0.7 : 1
   };
   if (huoLv >= 5) {
     f.huomaiLayers = 1;
@@ -218,8 +236,8 @@ function buildBondCompanionFighter() {
     changbing: (BOND_CHAR.changbing + extraStats.changbing) * boost,
     qimen: (BOND_CHAR.qimen + extraStats.qimen) * boost,
     hidden: (getBondHidden() + extraStats.hidden) * boost,
-    accuracy: 0.9 + qy * 0.0075,
-    evasion: 0.10 + qy * 0.01 + (qy >= 25 ? 0.1 : 0),
+    accuracy: 0.9 + qy * 0.0075 + (extraStats.accuracy || 0),
+    evasion: 0.10 + qy * 0.01 + (qy >= 25 ? 0.1 : 0) + (extraStats.evasion || 0),
     root: getBondRoot() * boost,
     comp: getBondComp() * boost,
     luck: getBondLuck() * boost,
@@ -265,30 +283,36 @@ function buildAllyTeam(excludeIds, withCompanion) {
 function applyDamageToFighter(f, dmg) {
   let remain = Math.max(0, Number(dmg) || 0);
   let absorbed = 0;
+  let yuxuAbsorbed = 0;
   if (Number(f.haoranLayers) > 0) {
-  const perLayer = HAORAN_SHIELD_PER_LAYER;
-  const capacity = Math.max(0, f.haoranLayers * perLayer - (Number(f.haoranAccum) || 0));
-  absorbed = Math.min(remain, capacity);
-  f.haoranAccum = (Number(f.haoranAccum) || 0) + absorbed;
-  while (f.haoranLayers > 0 && f.haoranAccum >= perLayer) {
-    f.haoranAccum -= perLayer;
-    f.haoranLayers -= 1;
+    const perLayer = HAORAN_SHIELD_PER_LAYER;
+    const capacity = Math.max(0, f.haoranLayers * perLayer - (Number(f.haoranAccum) || 0));
+    absorbed = Math.min(remain, capacity);
+    f.haoranAccum = (Number(f.haoranAccum) || 0) + absorbed;
+    while (f.haoranLayers > 0 && f.haoranAccum >= perLayer) {
+      f.haoranAccum -= perLayer;
+      f.haoranLayers -= 1;
+    }
+    if (f.haoranLayers <= 0) f.haoranAccum = 0;
+    remain -= absorbed;
   }
-  if (f.haoranLayers <= 0) f.haoranAccum = 0;
-  remain -= absorbed;
-}
+  if (remain > 0 && Number(f.yuxuShield) > 0) {
+    yuxuAbsorbed = Math.min(remain, Number(f.yuxuShield) || 0);
+    f.yuxuShield = Math.max(0, (Number(f.yuxuShield) || 0) - yuxuAbsorbed);
+    remain -= yuxuAbsorbed;
+  }
   f.hp -= remain;
-  return { absorbed, applied: remain };
+  return { absorbed, yuxuAbsorbed, applied: remain };
 }
 
 /* 对一方造成一段伤害：若击杀目标，溢出伤害按权重转移给另一个随机目标。 */
 function dealSegmentDamage(side, target, damage) {
   let remaining = Math.max(0, Number(damage) || 0);
   let cur = (target && target.hp > 0) ? target : pickWeightedTarget(side.filter(f => f.hp > 0));
-  const report = { applied: 0, absorbed: 0, hits: [], finalAlive: cur };
+  const report = { applied: 0, absorbed: 0, yuxuAbsorbed: 0, hits: [], finalAlive: cur };
   if (remaining <= 0) {
     if (cur && cur.hp > 0) {
-      report.hits.push({ fighter: cur, applied: 0, absorbed: 0, killed: false });
+      report.hits.push({ fighter: cur, applied: 0, absorbed: 0, yuxuAbsorbed: 0, killed: false });
     }
     return report;
   }
@@ -301,16 +325,17 @@ function dealSegmentDamage(side, target, damage) {
     const res = applyDamageToFighter(cur, remaining);
     report.applied += res.applied;
     report.absorbed += res.absorbed;
-    remaining -= (res.applied + res.absorbed);
+    report.yuxuAbsorbed += (res.yuxuAbsorbed || 0);
+    remaining -= (res.applied + res.absorbed + (res.yuxuAbsorbed || 0));
     if (cur.hp <= 0) {
       const over = -cur.hp;
       cur.hp = 0;
-      report.hits.push({ fighter: cur, applied: res.applied, absorbed: res.absorbed, killed: true });
+      report.hits.push({ fighter: cur, applied: res.applied, absorbed: res.absorbed, yuxuAbsorbed: res.yuxuAbsorbed || 0, killed: true });
       cur = null;
       report.finalAlive = null;
       remaining = over;
     } else {
-      report.hits.push({ fighter: cur, applied: res.applied, absorbed: res.absorbed, killed: false });
+      report.hits.push({ fighter: cur, applied: res.applied, absorbed: res.absorbed, yuxuAbsorbed: res.yuxuAbsorbed || 0, killed: false });
       report.finalAlive = cur;
       remaining = 0;
     }
@@ -329,11 +354,23 @@ function fighterNeiLi(f) {
   return Math.max(0, base - down);
 }
 
-/* 有效闪避：玩家及使用九思剑法的同伴额外计入【思退】层数 */
+/* 有效命中：含【太乙】每层 +5% */
+function fighterAccuracy(f) {
+  if (!f) return 0.9;
+  const base = f.isPlayer ? getAccuracyRate() : (Number(f.accuracy) || 0.9);
+  const taiyiAcc = (Number(f.taiyiLayers) || 0) * (typeof TAIYI_STACK_ACC === 'number' ? TAIYI_STACK_ACC : 0.05);
+  return Math.max(0, base + taiyiAcc);
+}
+
+/* 有效闪避：含【思退】、【太乙】、【遁影】、【冯虚御风】 */
 function fighterEvasion(f) {
   if (!f) return 0;
   const base = f.isPlayer ? (getEvasionRate() + (Number(f.bondEvasionBonus) || 0)) : (Number(f.evasion) || 0);
-  return Math.max(0, base + (Number(f.siTuiLayers) || 0) * JIUSI_SITUI_EVA);
+  const situi = (Number(f.siTuiLayers) || 0) * JIUSI_SITUI_EVA;
+  const taiyiEva = (Number(f.taiyiLayers) || 0) * (typeof TAIYI_STACK_EVA === 'number' ? TAIYI_STACK_EVA : 0.05);
+  const dunying = f.taiyiEvaBuff ? 1 : 0;
+  const fengxu = (Number(f.fengxuLayers) || 0) * (typeof FENGXU_EVA_PER_LAYER === 'number' ? FENGXU_EVA_PER_LAYER : 0.10);
+  return Math.max(0, base + situi + taiyiEva + dunying + fengxu);
 }
 
 function fighterAttackValue(f, stat) {
@@ -367,16 +404,112 @@ function fighterDefenseValue(f, stat) {
 
 function fighterDR(f) {
   if (!f) return 0;
-  if (f.isPlayer) return getTotalCon() + getExtraDR() + getNeiLiDR();
-  return (Number(f.con) || 0) + fighterNeiLi(f) * 0.5;
+  let dr = f.isPlayer
+    ? (getTotalCon() + getExtraDR() + getNeiLiDR())
+    : ((Number(f.con) || 0) + fighterNeiLi(f) * 0.5);
+  if ((Number(f.yuxuShield) || 0) > 0 && (Number(f.yuxuLevel) || 0) >= 10) {
+    dr += fighterNeiLi(f) * (Number(f.root) || 0) / 500;
+  }
+  return dr;
+}
+
+/* 一次完整攻击的一击制敌 / 卸劲归元判定（不按段数拆算） */
+function resolveAttackYiji(attacker, defender) {
+  if (!attacker || !defender) return { triggered: false, mult: 1 };
+  const atkPts = attacker.isPlayer ? getYijiPoints() : getEnemySkillValue('yiji', attacker);
+  const defPts = defender.isPlayer ? getYijiPoints() : getEnemySkillValue('yiji', defender);
+  const rate = Math.min(1, Math.max(0, atkPts - defPts / 2) * 0.01);
+  if (rate <= 0 || Math.random() >= rate) return { triggered: false, mult: 1 };
+  let mult = getYijiBonusMult(atkPts);
+  let halvedByZhuxie = false;
+  if (defender.zhuXieBiYi) {
+    mult = 1 + (mult - 1) * 0.5;
+    halvedByZhuxie = true;
+  }
+  return { triggered: true, mult, halvedByZhuxie };
+}
+
+function resolveAttackXiejin(defender, attacker) {
+  if (!defender || !attacker) return { triggered: false, reduce: 0 };
+  const defPts = defender.isPlayer ? getXiejinPoints() : getEnemySkillValue('xiejin', defender);
+  const atkPts = attacker.isPlayer ? getXiejinPoints() : getEnemySkillValue('xiejin', attacker);
+  const rate = Math.min(1, Math.max(0, defPts - atkPts / 2) * 0.01);
+  if (rate <= 0 || Math.random() >= rate) return { triggered: false, reduce: 0 };
+  const reduce = getXiejinReduce(fighterNeiLi(defender), defPts);
+  return { triggered: reduce > 0, reduce };
+}
+
+/* 一次完整攻击结算后的防御端反应：遁影消耗、冯虚御风叠层、先天罡气反震与加条 */
+function applyCompleteAttackDefenseReactions({ attacker, defender, defenderHadEvaBuff, defenderHadYuxuShield, hitSegments, missSegments }) {
+  if (!defender) return;
+  if (defenderHadEvaBuff && defender.taiyiEvaBuff) {
+    defender.taiyiEvaBuff = false;
+  }
+  if (missSegments > 0 && (Number(defender.lingxuLevel) || 0) >= 50 && defender.hp > 0) {
+    const prevFx = Number(defender.fengxuLayers) || 0;
+    if (prevFx < FENGXU_MAX_LAYERS) {
+      defender.fengxuLayers = prevFx + 1;
+      addLog(`【冯虚御风】${defender.isPlayer ? '你' : defender.name}身姿轻盈，【冯虚御风】叠至 ${defender.fengxuLayers} 层！`, 'win');
+    }
+  }
+  if (hitSegments > 0 && defenderHadYuxuShield && defender.hp > 0) {
+    const yuxuLv = Number(defender.yuxuLevel) || 0;
+    if (yuxuLv >= 30 && attacker && attacker.hp > 0 && !battle.over) {
+      const recoilRaw = Math.max(0, Math.round((fighterNeiLi(defender) * 1 + (Number(defender.root) || 0) * 10) * 10) / 10);
+      if (recoilRaw > 0) {
+        const attackerSide = attacker.side === 'ally' ? battle.allies : battle.enemies;
+        const rRes = dealSegmentDamage(attackerSide, attacker, recoilRaw);
+        const targetLabel = attacker.isPlayer ? '你' : attacker.name;
+        const defLabel = defender.isPlayer ? '你' : defender.name;
+        const rNotes = [];
+        if (rRes.absorbed > 0) rNotes.push(`浩然气化去 ${fmtNum(rRes.absorbed)} 点`);
+        if (rRes.yuxuAbsorbed > 0) rNotes.push(`先天罡气抵消 ${fmtNum(rRes.yuxuAbsorbed)} 点`);
+        addLog(`【先天罡气·反震】${defLabel}护盾震荡，反弹${targetLabel} ${fmtNum(Math.round(rRes.applied * 10) / 10)} 点固定伤害${rNotes.length ? `（${rNotes.join('，')}）` : ''}`, 'crit');
+        shakeCard(attacker);
+        if (attacker.hp <= 0) {
+          attacker.hp = 0;
+          addLog(`${targetLabel} 倒下了！`, 'dmg');
+        }
+      }
+    }
+    if (yuxuLv >= 50 && defender.hp > 0 && !battle.over) {
+      defender.bar = Math.min(10000, (Number(defender.bar) || 0) + 30);
+      addLog(`【先天罡气】${defender.isPlayer ? '你' : defender.name}受击聚气，行动条 +30%！`, 'win');
+    }
+  }
+}
+
+/* 消耗【凌虚】必闪敌方首次完整攻势（每场首次或100重刷新后触发一次） */
+function consumeLingxuFirstDodge(target, attacker, hitsCount) {
+  if (!target || !target.lingxuFirstDodge) return false;
+  target.lingxuFirstDodge = false;
+  if ((Number(target.lingxuLevel) || 0) >= 100) {
+    const now = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+    target.lingxuRegenNextAt = now + 20000;
+  }
+  const who = target.isPlayer ? '你' : target.name;
+  addLog(`【凌虚】${who}身形宛若乘虚御风，将${attacker.isPlayer ? '你' : attacker.name}的攻势尽数避开！`, 'win');
+  if ((Number(target.lingxuLevel) || 0) >= 50 && target.hp > 0) {
+    const prevFx = Number(target.fengxuLayers) || 0;
+    if (prevFx < FENGXU_MAX_LAYERS) {
+      target.fengxuLayers = prevFx + 1;
+      addLog(`【冯虚御风】${who}【冯虚御风】叠至 ${target.fengxuLayers} 层！`, 'win');
+    }
+  }
+  if (target.isPlayer && (hitsCount || 1) > 0) {
+    tryPlayerJiusiCounter(attacker, target, Math.max(1, Number(hitsCount) || 1));
+  }
+  return true;
 }
 
 /* 己方（主角或同伴）受到敌方攻击时的闪避与增伤判定。 */
 function resolveAllyDodge(attacker, target) {
-  const baseAcc = Number(attacker.accuracy) || 0.9;
+  const baseAcc = fighterAccuracy(attacker);
   const isPlayerT = !!target.isPlayer;
   const eva = fighterEvasion(target);
-  const enemyXushi = Math.random() < Math.min(1, Math.max(0, ((Number(attacker.comp) || 0) * 0.5 - getXushiPoints() / 2) * 0.01));
+  const atkXushi = getEnemySkillValue('xushi', attacker);
+  const defXushi = isPlayerT ? getXushiPoints() : getEnemySkillValue('xushi', target);
+  const enemyXushi = Math.random() < Math.min(1, Math.max(0, (atkXushi - defXushi / 2) * 0.01));
   let acc = baseAcc;
   let overflow = 0;
   if (enemyXushi) {
@@ -448,6 +581,7 @@ function getPlayerAttackStyle() {
   if (sel === 'feishipo' && getFeishipoLevel() > 0) return 'feishipo';
   if (sel === 'jiusi' && getJiusiLevel() > 0) return 'jiusi';
   if (sel === 'paodingDao' && hasPaodingDao()) return 'paodingDao';
+  if (sel === 'taiyi' && getTaiyiLevel() > 0) return 'taiyi';
   return 'zhenshan';
 }
 
@@ -460,6 +594,7 @@ function doPlayerAttack() {
     if (sid === 'zhenshan') return doZhenshanAttack();
     if (sid === 'jiusi' && getJiusiLevel() > 0) return doJiusiAttack();
     if (sid === 'paodingDao' && hasPaodingDao()) return doPaodingDaoAttack();
+    if (sid === 'taiyi' && getTaiyiLevel() > 0) return doTaiyiAttack();
     if (sid === 'jinzhen' && typeof hasJinzhenTechnique === 'function' && hasJinzhenTechnique()) return doPlayerJinzhen();
     if (sid) return;
   }
@@ -467,6 +602,7 @@ function doPlayerAttack() {
   if (style === 'feishipo') return doFeishipoAttack();
   if (style === 'jiusi') return doJiusiAttack();
   if (style === 'paodingDao') return doPaodingDaoAttack();
+  if (style === 'taiyi') return doTaiyiAttack();
   return doZhenshanAttack();
 }
 
@@ -570,6 +706,26 @@ function doPaodingDaoAttack() {
   }
 }
 
+function doTaiyiAttack() {
+  const primary = pickWeightedTarget((battle.enemies || []).filter(f => f && f.hp > 0));
+  if (!primary) return;
+  const level = getTaiyiLevel();
+  const stats = getTaiyiStats(level);
+
+  performTaiyiStrike(stats, 1, 1, primary);
+  if (battle.over) return;
+
+  const mianmianCount = rollMianmianCount(getMianmianRate(getEnemySkillValue('mianmian', primary)));
+  for (let c = 0; c < mianmianCount; c++) {
+    if (battle.over) return;
+    const t = pickWeightedTarget((battle.enemies || []).filter(f => f && f.hp > 0));
+    if (!t) return;
+    addLog('【延绵不绝】你气机未断，招式连绵再起！', 'crit');
+    performTaiyiStrike(stats, 1, 0.3, t);
+    if (battle.over) return;
+  }
+}
+
 /* 玩家特技：与赵大夫的金针渡穴一致，可治疗指定同伴或气血比例最低的己方成员，随后停止行动 3 秒 */
 function doPlayerJinzhen(preferredTarget) {
   const me = playerFighter();
@@ -603,7 +759,7 @@ function performWangbaStrike(stats, effectMultiplier, scale, target) {
     vulnerable: false,
     calcDamage: (mult, eff, e) => calcFistDamage(mult, eff, e, layers, doubleHanShan)
   });
-  /* 【撼山势】施展后叠一层，上限 100 */
+  /* 【撼山势】施展震山拳后叠一层，上限 100 */
   if (pf) pf.hanShiLayers = Math.min(HANSHAN_MAX_LAYERS, layers + 1);
   return res;
 }
@@ -630,10 +786,79 @@ function performJiusiStrike(stats, effectMultiplier, scale, target, opts) {
     scale,
     target,
     vulnerable: false,
+    isSwordSkill: true,
     calcDamage: (mult, eff, e) => calcSwordDamage(mult, eff, e, opts)
   });
   /* 【思退】：每次使用后叠一层，上限 9 */
   if (pf) pf.siTuiLayers = Math.min(JIUSI_SITUI_MAX, (Number(pf.siTuiLayers) || 0) + 1);
+  return res;
+}
+
+function triggerTaiyiJianqiBonusHits(attacker, sideList, target, qiLayers, isHundred) {
+  const count = Math.max(0, Math.floor(Number(qiLayers) || 0));
+  if (count <= 0 || !attacker || attacker.hp <= 0 || battle.over) return;
+  const dmgMult = isHundred ? 0.2 : 0.1;
+  let cur = (target && target.hp > 0) ? target : pickWeightedTarget((sideList || []).filter(f => f && f.hp > 0));
+  if (!cur) return;
+  let hitsDone = 0;
+  let appliedTotal = 0;
+  let absorbedTotal = 0;
+  let yuxuTotal = 0;
+  const acc = fighterAccuracy(attacker);
+  for (let i = 0; i < count; i++) {
+    const alive = (sideList || []).filter(f => f && f.hp > 0);
+    if (!alive.length || battle.over) break;
+    if (!cur || cur.hp <= 0) cur = pickWeightedTarget(alive);
+    if (!cur) break;
+    if (Math.random() >= calcHitChance(acc, fighterEvasion(cur))) continue;
+    let dmg = attacker.isPlayer
+      ? calcTaiyiDamage(dmgMult, 1, cur)
+      : calcFighterAttackDamage(attacker, cur, dmgMult);
+    if (Number(attacker.damageDealtMult) > 0) dmg *= Number(attacker.damageDealtMult);
+    if (Number(cur.damageTakenMult) > 0) dmg *= Number(cur.damageTakenMult);
+    dmg = Math.max(0, Math.round(dmg * 10) / 10);
+    const res = dealSegmentDamage(sideList, cur, dmg);
+    hitsDone++;
+    appliedTotal += res.applied;
+    absorbedTotal += res.absorbed;
+    yuxuTotal += (res.yuxuAbsorbed || 0);
+    cur = res.finalAlive;
+  }
+  const who = attacker.isPlayer ? '你' : attacker.name;
+  const notes = [`${hitsDone}/${count}道命中`];
+  if (absorbedTotal > 0) notes.push(`浩然气化去 ${fmtNum(absorbedTotal)} 点`);
+  if (yuxuTotal > 0) notes.push(`先天罡气抵消 ${fmtNum(yuxuTotal)} 点`);
+  addLog(`【太乙剑气】${who}剑意余韵破空而出，额外造成 ${fmtNum(Math.round(appliedTotal * 10) / 10)} 点剑法伤害（${notes.join('，')}）`, 'crit');
+}
+
+function performTaiyiStrike(stats, effectMultiplier, scale, target) {
+  const pf = playerFighter();
+  const level = getTaiyiLevel();
+  const res = performStrike({
+    name: '太乙伏魔剑',
+    stats,
+    effectMultiplier,
+    scale,
+    target,
+    vulnerable: false,
+    isSwordSkill: true,
+    calcDamage: (mult, eff, e) => calcTaiyiDamage(mult, eff, e)
+  });
+  if (pf && pf.hp > 0) {
+    const hitCount = res ? res.hitSegments : 0;
+    if (level >= 25 && hitCount > 0 && (Number(pf.taiyiLayers) || 0) > 0) {
+      const consumed = Number(pf.taiyiLayers) || 0;
+      pf.taiyiLayers = 0;
+      pf.taiyiJianqiBuff = (Number(pf.taiyiJianqiBuff) || 0) + consumed;
+      addLog(`【太乙剑气】你收剑凝神，将 ${consumed} 层【太乙】化为【太乙剑气】！`, 'crit');
+    }
+    if ((hitCount === 0 && level >= 10) || level >= 70) {
+      const prev = Number(pf.taiyiLayers) || 0;
+      pf.taiyiLayers = Math.min(TAIYI_MAX_LAYERS, prev + 1);
+      if (level >= 35) pf.taiyiEvaBuff = true;
+      addLog(`【太乙】${hitCount === 0 ? '招式落空而剑势更蓄，' : ''}【太乙】叠至 ${pf.taiyiLayers} 层${level >= 35 ? '，获得【遁影】' : ''}。`, 'win');
+    }
+  }
   return res;
 }
 
@@ -678,15 +903,26 @@ function performPaodingDaoStrike(stats, effectMultiplier, scale, target) {
 
 function performStrike(opts) {
   const initialTarget = opts.target || pickWeightedTarget((battle.enemies || []).filter(f => f && f.hp > 0));
-  if (!initialTarget || initialTarget.hp <= 0) return;
+  if (!initialTarget || initialTarget.hp <= 0) return null;
 
+  const pf = playerFighter();
   const stats = opts.stats;
   const name = opts.name;
   const effectMultiplier = Number(opts.effectMultiplier) || 1;
   const scale = Number(opts.scale) || 1;
 
+  const defenderHadEvaBuff = !!initialTarget.taiyiEvaBuff;
+  const defenderHadYuxuShield = (Number(initialTarget.yuxuShield) || 0) > 0;
+
+  if (consumeLingxuFirstDodge(initialTarget, pf, stats.hits)) {
+    if (typeof storyBattleAfterAttack === 'function') {
+      storyBattleAfterAttack({ attacker: pf, target: initialTarget, hitSegments: 0, missSegments: stats.hits });
+    }
+    return { hitSegments: 0, missSegments: stats.hits };
+  }
+
   const xushi = Math.random() < Math.min(1, getXushiRate(getEnemySkillValue('xushi', initialTarget)));
-  const baseAcc = getAccuracyRate();
+  const baseAcc = pf ? fighterAccuracy(pf) : getAccuracyRate();
   let acc = baseAcc;
   let xuriOverflow = 0;
   if (xushi) {
@@ -695,11 +931,19 @@ function performStrike(opts) {
   }
   acc += Number(opts.accuracyBonus) || 0;
 
+  const yiji = pf ? resolveAttackYiji(pf, initialTarget) : { triggered: false, mult: 1 };
+  const xiejin = pf ? resolveAttackXiejin(initialTarget, pf) : { triggered: false, reduce: 0 };
+  let xiejinPool = xiejin.triggered ? xiejin.reduce : 0;
+  let xiejinReducedTotal = 0;
+
+  const dealMult = Number(pf && pf.damageDealtMult) > 0 ? Number(pf.damageDealtMult) : 1;
+
   let cur = initialTarget;
   let hitSegments = 0;
   let missSegments = 0;
   let segmentDamage = 0;
   let absorbedTotal = 0;
+  let yuxuAbsorbedTotal = 0;
   const touched = new Map();
   const kills = [];
 
@@ -715,13 +959,23 @@ function performStrike(opts) {
     if (xuriOverflow > 0) dmg *= (1 + xuriOverflow);
     const vuln = opts.vulnerable ? Math.max(0, Number(e.vulnerable) || 0) : 0;
     if (vuln > 0) dmg *= (1 + vuln);
+    if (yiji.triggered) dmg *= yiji.mult;
+    dmg *= dealMult;
+    if (Number(e.damageTakenMult) > 0) dmg *= Number(e.damageTakenMult);
     dmg = Math.max(0, Math.round(dmg * scale * 10) / 10);
     if (typeof opts.flatPerHit === 'function') {
       const flat = Number(opts.flatPerHit()) || 0;
       if (flat > 0) dmg += flat;
     }
+    if (xiejinPool > 0 && dmg > 0) {
+      const cut = Math.min(dmg, xiejinPool);
+      dmg = Math.round((dmg - cut) * 10) / 10;
+      xiejinPool = Math.max(0, xiejinPool - cut);
+      xiejinReducedTotal += cut;
+    }
     const res = dealSegmentDamage(battle.enemies, cur, dmg);
     absorbedTotal += res.absorbed;
+    yuxuAbsorbedTotal += (res.yuxuAbsorbed || 0);
     segmentDamage += res.applied;
     hitSegments++;
     for (const h of res.hits) {
@@ -739,21 +993,28 @@ function performStrike(opts) {
     triggerJieniu(cur);
     cur = res.finalAlive;
     if (battle.over) break;
-    const pf = playerFighter();
     if (pf && pf.hp <= 0) break;
   }
 
   if (hitSegments <= 0) {
     addLog(`你施展【${name}】，却尽数被闪避（命中率 ${formatPercent(calcHitChance(acc, fighterEvasion(initialTarget)))}）`, '');
+    applyCompleteAttackDefenseReactions({
+      attacker: pf,
+      defender: initialTarget,
+      defenderHadEvaBuff,
+      defenderHadYuxuShield,
+      hitSegments,
+      missSegments
+    });
     if (typeof storyBattleAfterAttack === 'function') {
       storyBattleAfterAttack({
-        attacker: playerFighter(),
+        attacker: pf,
         target: initialTarget,
         hitSegments,
         missSegments
       });
     }
-    return;
+    return { hitSegments, missSegments };
   }
 
   const neiBonus = Math.round(getNeiLiDamageBonus() * scale * 10) / 10;
@@ -764,7 +1025,10 @@ function performStrike(opts) {
   if (missSegments) detail.push(`${missSegments}段被闪避`);
   if (xushi) detail.push(`虚实莫测·命中 ${formatPercent(calcHitChance(acc, fighterEvasion(initialTarget)))}`);
   if (xuriOverflow > 0) detail.push(`溢出命中增伤 +${Math.round(xuriOverflow * 100)}%`);
+  if (yiji.triggered) detail.push(`一击制敌${yiji.halvedByZhuxie ? '（诸邪辟易减半）' : ''} ×${yiji.mult.toFixed(2)}`);
+  if (xiejinReducedTotal > 0) detail.push(`卸劲归元减免 ${fmtNum(Math.round(xiejinReducedTotal * 10) / 10)} 点`);
   if (absorbedTotal > 0) detail.push(`浩然气化去 ${fmtNum(absorbedTotal)} 点`);
+  if (yuxuAbsorbedTotal > 0) detail.push(`先天罡气抵消 ${fmtNum(Math.round(yuxuAbsorbedTotal * 10) / 10)} 点`);
   if (scale < 1) detail.push(`效果 ${Math.round(scale * 100)}%`);
   if (kills.length) detail.push(`击倒 ${[...new Set(kills)].join('、')}`);
   if (touched.size > 1) {
@@ -774,7 +1038,23 @@ function performStrike(opts) {
   addLog(`你施展【${name}】，对${targetText}造成 ${fmtNum(totalDamage)} 点伤害（${detail.join('，')}）`, 'dmg');
   shakeCard(cur || initialTarget);
 
-  if (initialTarget.hp > 0 && !battle.over) doWujiuCounter(initialTarget, stats.hits, playerFighter());
+  if (opts.isSwordSkill && !opts.isSubHit && pf && pf.hp > 0 && (Number(pf.taiyiJianqiBuff) || 0) > 0 && !battle.over) {
+    const qLayers = Number(pf.taiyiJianqiBuff) || 0;
+    pf.taiyiJianqiBuff = 0;
+    triggerTaiyiJianqiBonusHits(pf, battle.enemies, cur || initialTarget, qLayers, getTaiyiLevel() >= 100);
+  }
+
+  applyCompleteAttackDefenseReactions({
+    attacker: pf,
+    defender: initialTarget,
+    defenderHadEvaBuff,
+    defenderHadYuxuShield,
+    hitSegments,
+    missSegments
+  });
+
+  if (initialTarget.hp > 0 && !battle.over) doWujiuCounter(initialTarget, stats.hits, pf);
+  return { hitSegments, missSegments };
 }
 
 function doWujiuCounter(e, hits, attacker) {
@@ -794,10 +1074,11 @@ function doWujiuCounter(e, hits, attacker) {
   const perHit = Math.max(0, Math.round((20 + own + (own - against / 2) * 2.5) * (0.1 * stacks) * 2 * 10) / 10);
   const hitCount = Math.max(1, Number(hits) || 1);
   const totalDR = fighterDR(target);
-  const dmg = Math.max(0, Math.round((perHit * hitCount - totalDR) * 10) / 10);
-  target.hp -= dmg;
+  let dmg = Math.max(0, Math.round((perHit * hitCount - totalDR) * 10) / 10);
+  if (Number(target.damageTakenMult) > 0) dmg = Math.round(dmg * Number(target.damageTakenMult) * 10) / 10;
+  const res = applyDamageToFighter(target, dmg);
   const who = target.isPlayer ? '你' : target.name;
-  addLog(`【无咎】${e.name} 回防了破绽之处并顺势反击，以${hitCount}指伤${who} ${fmtNum(dmg)} 点（消耗 1 层，剩余 ${e.wujiuStacks} 层）`, 'dmg');
+  addLog(`【无咎】${e.name} 回防了破绽之处并顺势反击，以${hitCount}指伤${who} ${fmtNum(Math.round(res.applied * 10) / 10)} 点${res.yuxuAbsorbed > 0 ? `（先天罡气抵消 ${fmtNum(Math.round(res.yuxuAbsorbed * 10) / 10)} 点）` : ''}（消耗 1 层，剩余 ${e.wujiuStacks} 层）`, 'dmg');
   shakeCard(target);
   if (target.hp <= 0) {
     target.hp = 0;
@@ -821,7 +1102,11 @@ function doJiemai(e) {
   const a = e.attack || {};
   const hits = Math.max(1, Number(a.hits) || 1);
   const mult = Number(a.multiplier) || 0;
-  const own = Number(e.fist) || 0;
+  const defenderHadEvaBuff = !!target.taiyiEvaBuff;
+  const defenderHadYuxuShield = (Number(target.yuxuShield) || 0) > 0;
+  if (consumeLingxuFirstDodge(target, e, hits)) return;
+
+  const own = fighterAttackValue(e, 'fist');
   const against = fighterDefenseValue(target, 'fist');
   const perHit = Math.max(0, (20 + own + (own - against / 2) * 2.5) * mult * 2);
   let landed = 0, missed = 0;
@@ -832,17 +1117,32 @@ function doJiemai(e) {
   const who = target.isPlayer ? '你' : target.name;
   if (!landed) {
     addLog(`${e.name} 施展【${a.name || '截脉指'}】，指锋尽数落空，${who}未被封住经脉。`, '');
+    applyCompleteAttackDefenseReactions({ attacker: e, defender: target, defenderHadEvaBuff, defenderHadYuxuShield, hitSegments: 0, missSegments: missed });
     if (missed > 0) tryPlayerJiusiCounter(e, target, missed);
     return;
   }
-  const dmg = Math.max(0, Math.round((perHit * landed - fighterDR(target)) * 10) / 10);
-  target.hp -= dmg;
+  let dmg = Math.max(0, perHit * landed - fighterDR(target));
+  const yiji = resolveAttackYiji(e, target);
+  if (yiji.triggered) dmg *= yiji.mult;
+  if (Number(target.damageTakenMult) > 0) dmg *= Number(target.damageTakenMult);
+  const xiejin = resolveAttackXiejin(target, e);
+  let xiejinCut = 0;
+  if (xiejin.triggered && dmg > 0) {
+    xiejinCut = Math.min(dmg, xiejin.reduce);
+    dmg = Math.max(0, dmg - xiejinCut);
+  }
+  dmg = Math.round(dmg * 10) / 10;
+  const res = applyDamageToFighter(target, dmg);
   if (target.hp < 0) target.hp = 0;
   target.jiumai = (Number(target.jiumai) || 0) + landed;
   const notes = [`${landed}段命中`];
   if (missed) notes.push(`${missed}段被闪避`);
-  addLog(`【截脉指】${e.name} 指力点中${who}经脉，造成 ${fmtNum(dmg)} 点伤害（${notes.join('，')}），【截脉】积至 ${target.jiumai} 层`, 'dmg');
+  if (yiji.triggered) notes.push(`一击制敌 ×${yiji.mult.toFixed(2)}`);
+  if (xiejinCut > 0) notes.push(`卸劲归元减免 ${fmtNum(Math.round(xiejinCut * 10) / 10)} 点`);
+  if (res.yuxuAbsorbed > 0) notes.push(`先天罡气抵消 ${fmtNum(Math.round(res.yuxuAbsorbed * 10) / 10)} 点`);
+  addLog(`【截脉指】${e.name} 指力点中${who}经脉，造成 ${fmtNum(Math.round(res.applied * 10) / 10)} 点伤害（${notes.join('，')}），【截脉】积至 ${target.jiumai} 层`, 'dmg');
   shakeCard(target);
+  applyCompleteAttackDefenseReactions({ attacker: e, defender: target, defenderHadEvaBuff, defenderHadYuxuShield, hitSegments: landed, missSegments: missed });
   if (target.hp <= 0) addLog(`${target.name} 倒下了！`, 'dmg');
   else if (missed > 0) tryPlayerJiusiCounter(e, target, missed);
 }
@@ -886,7 +1186,7 @@ function doEnemyAttack(e) {
       return;
     }
     const dmg = Math.max(0, Math.round(calcNormalDamage(1) * 10) / 10);
-    e.hp -= dmg;
+    applyDamageToFighter(e, dmg);
     addLog(`${e.name} 陷入混乱，攻击了自己，造成 ${fmtNum(dmg)} 点伤害！`, 'dmg');
     shakeCard(e);
     if (e.hp <= 0) e.hp = 0;
@@ -897,11 +1197,16 @@ function doEnemyAttack(e) {
   if (!target) return;
 
   const who = target.isPlayer ? '你' : target.name;
+  const defenderHadEvaBuff = !!target.taiyiEvaBuff;
+  const defenderHadYuxuShield = (Number(target.yuxuShield) || 0) > 0;
+
   if (e.attack) {
     const a = e.attack;
+    const hits = Math.max(1, Number(a.hits) || 1);
+    if (consumeLingxuFirstDodge(target, e, hits)) return;
+
     const own = fighterAttackValue(e, a.stat);
     const against = fighterDefenseValue(target, a.stat);
-    const hits = Math.max(1, Number(a.hits) || 1);
     const perHit = Math.max(0, (20 + own + (own - against / 2) * 2.5) * (Number(a.multiplier) || 0) * 2);
 
     let landed = 0;
@@ -910,7 +1215,7 @@ function doEnemyAttack(e) {
     let hitRawTotal = 0;
     let maxOverflow = 0;
     let anyEnemyXushi = false;
-    let lastAcc = Number(e.accuracy) || 0.9;
+    let lastAcc = fighterAccuracy(e);
     let lastEva = fighterEvasion(target);
 
     for (let i = 0; i < hits; i++) {
@@ -928,6 +1233,9 @@ function doEnemyAttack(e) {
       hitRawTotal += perHit * (dodge.overflow > 0 ? (1 + dodge.overflow) : 1);
     }
 
+    const taiyiLv = Number(e.taiyiLevel) || 0;
+    const isTaiyiSkill = a.name === '太乙伏魔剑' || taiyiLv > 0;
+
     if (landed <= 0) {
       addLog(
         lastDodgeKind === 'qingyuan'
@@ -937,23 +1245,59 @@ function doEnemyAttack(e) {
             : `${who}侧身避开了${e.name}的攻击。`),
         lastDodgeKind ? 'win' : ''
       );
+      if (isTaiyiSkill && taiyiLv >= 10) {
+        e.taiyiLayers = Math.min(TAIYI_MAX_LAYERS, (Number(e.taiyiLayers) || 0) + 1);
+        if (taiyiLv >= 35) e.taiyiEvaBuff = true;
+        addLog(`【太乙】${e.name}剑势未竭，【太乙】叠至 ${e.taiyiLayers} 层${taiyiLv >= 35 ? '，获得【遁影】' : ''}。`, '');
+      }
+      applyCompleteAttackDefenseReactions({ attacker: e, defender: target, defenderHadEvaBuff, defenderHadYuxuShield, hitSegments: 0, missSegments: missed });
       if (missed > 0) tryPlayerJiusiCounter(e, target, missed);
       return;
     }
 
     const avgMult = (perHit > 0 && landed > 0) ? (hitRawTotal / (perHit * landed)) : 1;
     let dmg = Math.max(0, perHit * landed - fighterDR(target)) * avgMult;
+    const yiji = resolveAttackYiji(e, target);
+    if (yiji.triggered) dmg *= yiji.mult;
+    if (Number(e.damageDealtMult) > 0) dmg *= Number(e.damageDealtMult);
     if (Number(target.damageTakenMult) > 0) dmg *= Number(target.damageTakenMult);
+    const xiejin = resolveAttackXiejin(target, e);
+    let xiejinCut = 0;
+    if (xiejin.triggered && dmg > 0) {
+      xiejinCut = Math.min(dmg, xiejin.reduce);
+      dmg = Math.max(0, dmg - xiejinCut);
+    }
     dmg = Math.round(dmg * 10) / 10;
 
-    target.hp -= dmg;
+    const res = applyDamageToFighter(target, dmg);
     const notes = [];
     if (hits > 1) notes.push(`${landed}段命中`);
     if (missed > 0) notes.push(`${missed}段被闪避`);
     if (anyEnemyXushi) notes.push(`虚实莫测·命中 ${formatPercent(calcHitChance(lastAcc, lastEva))}`);
     if (maxOverflow > 0) notes.push(`溢出命中增伤 +${Math.round(maxOverflow * 100)}%`);
-    addLog(`${e.name} 施展【${a.name}】，对${who}造成 ${fmtNum(dmg)} 点伤害${notes.length ? `（${notes.join('，')}）` : ''}`, 'dmg');
+    if (yiji.triggered) notes.push(`一击制敌${yiji.halvedByZhuxie ? '（诸邪辟易减半）' : ''} ×${yiji.mult.toFixed(2)}`);
+    if (xiejinCut > 0) notes.push(`卸劲归元减免 ${fmtNum(Math.round(xiejinCut * 10) / 10)} 点`);
+    if (res.yuxuAbsorbed > 0) notes.push(`先天罡气抵消 ${fmtNum(Math.round(res.yuxuAbsorbed * 10) / 10)} 点`);
+    addLog(`${e.name} 施展【${a.name}】，对${who}造成 ${fmtNum(Math.round(res.applied * 10) / 10)} 点伤害${notes.length ? `（${notes.join('，')}）` : ''}`, 'dmg');
     shakeCard(target);
+
+    if (isTaiyiSkill && target.hp > 0 && (Number(e.taiyiJianqiBuff) || 0) > 0) {
+      const qLayers = Number(e.taiyiJianqiBuff) || 0;
+      e.taiyiJianqiBuff = 0;
+      triggerTaiyiJianqiBonusHits(e, battle.allies, target, qLayers, taiyiLv >= 100);
+    }
+    if (isTaiyiSkill) {
+      if (taiyiLv >= 25 && (Number(e.taiyiLayers) || 0) > 0) {
+        const consumed = Number(e.taiyiLayers) || 0;
+        e.taiyiLayers = 0;
+        e.taiyiJianqiBuff = (Number(e.taiyiJianqiBuff) || 0) + consumed;
+        addLog(`【太乙剑气】${e.name}引动 ${consumed} 层【太乙】，凝成【太乙剑气】！`, '');
+      }
+      if (taiyiLv >= 70) {
+        e.taiyiLayers = Math.min(TAIYI_MAX_LAYERS, (Number(e.taiyiLayers) || 0) + 1);
+        e.taiyiEvaBuff = true;
+      }
+    }
 
     if (a.bleed && target.hp > 0) {
       const bleedHits = Math.max(1, landed);
@@ -961,6 +1305,8 @@ function doEnemyAttack(e) {
       if (!target.bleedNextAt) target.bleedNextAt = (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now()) + 1000;
       addLog(`【流血】${who}被${a.name}咬中，流血叠加至 ${target.bleedStacks} 层。`, 'dmg');
     }
+
+    applyCompleteAttackDefenseReactions({ attacker: e, defender: target, defenderHadEvaBuff, defenderHadYuxuShield, hitSegments: landed, missSegments: missed });
 
     if (target.hp <= 0) {
       target.hp = 0;
@@ -970,6 +1316,8 @@ function doEnemyAttack(e) {
     }
     return;
   }
+
+  if (consumeLingxuFirstDodge(target, e, 1)) return;
 
   const dodge = resolveAllyDodge(e, target);
   if (dodge.dodged) {
@@ -981,6 +1329,7 @@ function doEnemyAttack(e) {
           : `${who}侧身避开了${e.name}的攻击。`),
       dodge.dodgeKind ? 'win' : ''
     );
+    applyCompleteAttackDefenseReactions({ attacker: e, defender: target, defenderHadEvaBuff, defenderHadYuxuShield, hitSegments: 0, missSegments: 1 });
     tryPlayerJiusiCounter(e, target, 1);
     return;
   }
@@ -988,15 +1337,29 @@ function doEnemyAttack(e) {
   const rawDmg = (Number(e.atk) || 0) + Math.round(Math.random() * 4) - 2;
   let dmg = Math.max(0, rawDmg - fighterDR(target));
   if (dodge.overflow > 0) dmg *= (1 + dodge.overflow);
+  const yiji = resolveAttackYiji(e, target);
+  if (yiji.triggered) dmg *= yiji.mult;
+  if (Number(e.damageDealtMult) > 0) dmg *= Number(e.damageDealtMult);
   if (Number(target.damageTakenMult) > 0) dmg *= Number(target.damageTakenMult);
+  const xiejin = resolveAttackXiejin(target, e);
+  let xiejinCut = 0;
+  if (xiejin.triggered && dmg > 0) {
+    xiejinCut = Math.min(dmg, xiejin.reduce);
+    dmg = Math.max(0, dmg - xiejinCut);
+  }
   dmg = Math.round(dmg * 10) / 10;
 
-  target.hp -= dmg;
+  const res = applyDamageToFighter(target, dmg);
   const notes = [];
   if (dodge.enemyXushi) notes.push(`虚实莫测·命中 ${formatPercent(calcHitChance(dodge.acc, dodge.eva))}`);
   if (dodge.overflow > 0) notes.push(`溢出命中增伤 +${Math.round(dodge.overflow * 100)}%`);
-  addLog(`${e.name} 施展【攻势】，对${who}造成 ${fmtNum(dmg)} 点伤害${notes.length ? `（${notes.join('，')}）` : ''}`, 'dmg');
+  if (yiji.triggered) notes.push(`一击制敌${yiji.halvedByZhuxie ? '（诸邪辟易减半）' : ''} ×${yiji.mult.toFixed(2)}`);
+  if (xiejinCut > 0) notes.push(`卸劲归元减免 ${fmtNum(Math.round(xiejinCut * 10) / 10)} 点`);
+  if (res.yuxuAbsorbed > 0) notes.push(`先天罡气抵消 ${fmtNum(Math.round(res.yuxuAbsorbed * 10) / 10)} 点`);
+  addLog(`${e.name} 施展【攻势】，对${who}造成 ${fmtNum(Math.round(res.applied * 10) / 10)} 点伤害${notes.length ? `（${notes.join('，')}）` : ''}`, 'dmg');
   shakeCard(target);
+
+  applyCompleteAttackDefenseReactions({ attacker: e, defender: target, defenderHadEvaBuff, defenderHadYuxuShield, hitSegments: 1, missSegments: 0 });
 
   if (target.hp <= 0) {
     target.hp = 0;
@@ -1058,6 +1421,16 @@ function getBondCompanionSkillSpec(skillId, f) {
       hits: st.hits,
       multiplier: st.multiplier,
       stat: 'hidden'
+    };
+  }
+  if (skillId === 'taiyi' && lv > 0) {
+    const st = getTaiyiStats(lv);
+    return {
+      id: 'taiyi',
+      name: '太乙伏魔剑',
+      hits: st.hits,
+      multiplier: st.multiplier,
+      stat: 'sword'
     };
   }
   const atk = (f && f.attack) || {};
@@ -1287,17 +1660,18 @@ function battleTick() {
   if (isBattleTabVisible()) updateBattleUI();
 }
 
-/* 战斗开场效果：震山拳百重叠 20 层撼山势；九思剑法百重连出三剑 */
+/* 战斗开场效果：震山拳百重（需装备震山拳）叠 20 层撼山势；九思剑法百重（需装备九思剑法）连出七剑 */
 function applyBattleStartEffects() {
   const pf = playerFighter();
   if (!pf) return;
-  if (getWangbaLevel() >= 100) {
+  const eqCheck = typeof isPlayerSkillEquipped === 'function' ? isPlayerSkillEquipped : () => true;
+  if (getWangbaLevel() >= 100 && eqCheck('zhenshan')) {
     pf.hanShiLayers = Math.min(HANSHAN_MAX_LAYERS, (Number(pf.hanShiLayers) || 0) + 20);
     addLog(`【撼山势·起手】你沉肩坐马，一口气叠起 ${pf.hanShiLayers} 层【撼山势】。`, 'crit');
   }
-  if (getJiusiLevel() >= 100) {
-    addLog('【九思剑法·先手】战斗方起，你已连出三剑！', 'crit');
-    for (let i = 0; i < 3; i++) {
+  if (getJiusiLevel() >= 100 && eqCheck('jiusi')) {
+    addLog('【九思剑法·先手】战斗方起，你已连出七剑！', 'crit');
+    for (let i = 0; i < 7; i++) {
       if (battle.over) break;
       doJiusiAttack();
     }
@@ -1315,6 +1689,48 @@ function calcFighterBarSpeed(f, nowSt) {
   spd = Math.max(0, spd - (Number(f.jiumai) || 0) * JIUMAI_SPEED_DOWN);
   spd += (Number(f.huomaiLayers) || 0) * (Number(f.huomaiSpeedPerLayer) || 0);
   return spd;
+}
+
+function purgeRandomDebuffs(f, count) {
+  if (!f || f.hp <= 0) return [];
+  const removed = [];
+  for (let i = 0; i < count; i++) {
+    const pool = [];
+    if ((Number(f.daxueLayers) || 0) > 0) pool.push('daxue');
+    if ((Number(f.bleedStacks) || 0) > 0) pool.push('bleed');
+    if ((Number(f.weirdPoisonStacks) || 0) > 0) pool.push('weirdPoison');
+    if ((Number(f.jiumai) || 0) > 0) pool.push('jiumai');
+    if (f.confused) pool.push('confused');
+    if (f.vulnerable) pool.push('vulnerable');
+    if (f.qizhi) pool.push('qizhi');
+    if (!pool.length) break;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    if (pick === 'daxue') {
+      f.daxueLayers = Math.max(0, Number(f.daxueLayers) - 1);
+      if (f.daxueLayers < 0.01) f.daxueLayers = 0;
+      removed.push('打穴');
+    } else if (pick === 'bleed') {
+      f.bleedStacks = Math.max(0, Math.floor(Number(f.bleedStacks) || 0) - 1);
+      removed.push('流血');
+    } else if (pick === 'weirdPoison') {
+      f.weirdPoisonStacks = Math.max(0, Math.floor(Number(f.weirdPoisonStacks) || 0) - 1);
+      removed.push('诡异毒素');
+    } else if (pick === 'jiumai') {
+      f.jiumai = Math.max(0, (Number(f.jiumai) || 0) - 1);
+      removed.push('截脉');
+    } else if (pick === 'confused') {
+      f.confused = false;
+      removed.push('混乱');
+    } else if (pick === 'vulnerable') {
+      f.vulnerable = false;
+      removed.push('破防');
+    } else if (pick === 'qizhi') {
+      f.qizhi = false;
+      f.speed = (Number(f.speed) || 0) + (typeof QIZHI_SPEED_DOWN === 'number' ? QIZHI_SPEED_DOWN : 0.1);
+      removed.push('气滞');
+    }
+  }
+  return removed;
 }
 
 function battleStep(dt) {
@@ -1346,15 +1762,44 @@ function battleStep(dt) {
     }
   }
 
-  /* 震山拳百重：【撼山势】每秒自动叠加一层 */
+  /* 震山拳百重（需装备震山拳）：【撼山势】每秒自动叠加一层 */
   {
     const pf = playerFighter();
-    if (pf && pf.hp > 0 && getWangbaLevel() >= 100) {
+    const eqCheck = typeof isPlayerSkillEquipped === 'function' ? isPlayerSkillEquipped : () => true;
+    if (pf && pf.hp > 0 && getWangbaLevel() >= 100 && eqCheck('zhenshan')) {
       if (!battle.lastHanShanAt) battle.lastHanShanAt = nowSt;
       const ticks = Math.floor((nowSt - battle.lastHanShanAt) / 1000);
       if (ticks > 0) {
         battle.lastHanShanAt += ticks * 1000;
         pf.hanShiLayers = Math.min(HANSHAN_MAX_LAYERS, (Number(pf.hanShiLayers) || 0) + ticks);
+      }
+    }
+  }
+
+  /* 凌虚步百重刷新、冯虚御风 / 玉虚归真持续恢复、道渺渺【诸邪辟易】每秒驱散 5 层负面状态 */
+  for (const f of allFighters()) {
+    if (!f || f.hp <= 0) continue;
+    if (!f.lingxuFirstDodge && (Number(f.lingxuLevel) || 0) >= 100 && f.lingxuRegenNextAt && nowSt >= f.lingxuRegenNextAt) {
+      f.lingxuFirstDodge = true;
+      f.lingxuRegenNextAt = 0;
+      addLog(`【凌虚】${f.isPlayer ? '你' : f.name}周身清风再起，重新凝结【凌虚】！`, 'win');
+    }
+    const fengxu = Number(f.fengxuLayers) || 0;
+    if (fengxu > 0 && f.hp < f.maxHp) {
+      f.hp = Math.min(f.maxHp, f.hp + f.maxHp * (typeof FENGXU_HP_REGEN_PCT === 'number' ? FENGXU_HP_REGEN_PCT : 0.01) * fengxu * dt);
+    }
+    if ((Number(f.yuxuLevel) || 0) >= 100 && f.hp < f.maxHp) {
+      f.hp = Math.min(f.maxHp, f.hp + f.maxHp * 0.02 * dt);
+    }
+    if (f.zhuXieBiYi) {
+      if (!f.lastZhuXieAt) f.lastZhuXieAt = nowSt;
+      const zTicks = Math.floor((nowSt - f.lastZhuXieAt) / 1000);
+      if (zTicks > 0) {
+        f.lastZhuXieAt += zTicks * 1000;
+        const purged = purgeRandomDebuffs(f, 5 * zTicks);
+        if (purged.length) {
+          addLog(`【诸邪辟易】${f.name}周身清气一荡，消去 ${purged.length} 层负面状态。`, '');
+        }
       }
     }
   }
