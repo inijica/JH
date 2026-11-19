@@ -40,8 +40,8 @@ function getCookingRecipeStock(recipeId = cookingState.recipe) {
 function getAvailableCookRecipes() {
   const list = [COOK_RECIPES.kaoyu];
   if (typeof storyFlags !== 'undefined' && storyFlags.farmUnlocked) {
-    if (COOK_RECIPES.shucaiDunyu) list.push(COOK_RECIPES.shucaiDunyu);
     if (COOK_RECIPES.shuizhuShucai) list.push(COOK_RECIPES.shuizhuShucai);
+    if (COOK_RECIPES.shucaiDunyu) list.push(COOK_RECIPES.shucaiDunyu);
   }
   return list.filter(Boolean);
 }

@@ -4,18 +4,18 @@ const FISH_EFFECTS = {
   caoyu:     { stat: 'constitution', baseValue: 0.062, legacyPerWeight: 0.009, label: '体魄' },
   baitiao:   { stat: 'neiLi',        baseValue: 0.05,  legacyPerWeight: 0.24,  label: '内力' },
   chilinyu:  { stat: 'neiLi',        baseValue: 0.16,  legacyPerWeight: 0.35,  label: '内力' },
-  bailingyu: { stat: 'qinggongExp',  baseValue: 180,   label: '轻功经验' },
-  xishiban:  { stat: 'constitution', baseValue: 0.08,  label: '体魄' },
-  hongwei:   { stat: 'neiLi',        baseValue: 0.2,   label: '内力' },
+  bailingyu: { stat: 'qinggongExp',  baseValue: 207,   label: '轻功经验' },
+  xishiban:  { stat: 'constitution', baseValue: 0.096, label: '体魄' },
+  hongwei:   { stat: 'neiLi',        baseValue: 0.24,  label: '内力' },
   qingyu:    { stat: 'root',         baseValue: 0.024, label: '根骨' }
 };
 
 const VEG_EFFECTS = {
   fanqie:   { stat: 'constitution', baseValue: 0.5,  label: '体魄' },
   baicai:   { stat: 'neiLi',        baseValue: 2,    label: '内力' },
-  shanyao:  { stat: 'root',         baseValue: 0.05, label: '根骨' },
-  luobo:    { stat: 'comp',         baseValue: 0.05, label: '悟性' },
-  huanggua: { stat: 'luck',         baseValue: 0.05, label: '定力' }
+  shanyao:  { stat: 'root',         baseValue: 0.04, label: '根骨' },
+  luobo:    { stat: 'comp',         baseValue: 0.04, label: '悟性' },
+  huanggua: { stat: 'luck',         baseValue: 0.04, label: '定力' }
 };
 
 function getRawFishGain(fishId, data) {
@@ -406,19 +406,19 @@ const COOK_RECIPES = {
     stoveBonus: 5,
     duration: 3000
   },
-  shucaiDunyu: {
-    id: 'shucaiDunyu',
-    name: '蔬菜炖鱼',
-    desc: '鲜鱼与时蔬同锅细煨，二者滋味相融。额外获得 75% 庖丁经验。',
-    reqDesc: '需求：鱼类 ×1，蔬菜 ×1',
-    stoveBonus: 5,
-    duration: 3000
-  },
   shuizhuShucai: {
     id: 'shuizhuShucai',
     name: '水煮蔬菜',
     desc: '将时蔬入沸水轻焯煮熟，清鲜爽口。',
     reqDesc: '需求：蔬菜 ×1',
+    stoveBonus: 5,
+    duration: 3000
+  },
+  shucaiDunyu: {
+    id: 'shucaiDunyu',
+    name: '蔬菜炖鱼',
+    desc: '鲜鱼与时蔬同锅细煨，二者滋味相融。额外获得 75% 庖丁经验。',
+    reqDesc: '需求：鱼类 ×1，蔬菜 ×1',
     stoveBonus: 5,
     duration: 3000
   }

@@ -1,6 +1,6 @@
 /* 农田与技艺「农夫」系统（在 cooking.js 之后、training.js 与 game.js 之前加载） */
 const FARM_PLOT_COUNT = 9;
-const FARM_BASE_DURATION_MS = 12 * 60 * 1000;
+const FARM_BASE_DURATION_MS = 15 * 60 * 1000;
 const FARM_CROP_ORDER = ['fanqie', 'baicai', 'shanyao', 'luobo', 'huanggua'];
 
 const farmModalState = {
