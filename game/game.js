@@ -84,6 +84,7 @@ const player = {
   skills: [],
   techniques: [],
   inventory: [],
+  farm: typeof defaultFarmState === 'function' ? defaultFarmState() : { plots: [] },
   trainingActivity: '',
   trainingInteractionEfficiency: 0,
   trainingOtherBonus: 1,
@@ -147,9 +148,9 @@ function getFishingExpNeed(level) {
 }
 function getFishingLuckBonus(level = getFishingLevel()) {
   let bonus = Math.floor(level / 2);
-  if (level >= 10) bonus += 1;
-  if (level >= 30) bonus += 5;
-  if (level >= 70) bonus += 15;
+  if (level >= 10) bonus += 2;
+  if (level >= 30) bonus += 10;
+  if (level >= 70) bonus += 30;
   return bonus;
 }
 function getTotalLuck() { return (Number(player.luck) || 0) + getFishingLuckBonus(); }
@@ -163,9 +164,12 @@ function getFishingQualityFixed(level = getFishingLevel()) {
 function getFishingQualityMultiplier(level = getFishingLevel()) {
   return (level >= 10 ? 1.1 : 1) * (level >= 30 ? 1.2 : 1) * (level >= 70 ? 1.5 : 1);
 }
+function getFishingSpeedFactor(level = getFishingLevel(), concurrent = !!(typeof player !== 'undefined' && player && player.trainingActivity && level >= 100)) {
+  return Math.max(0.1, 1 + level / 100 - (concurrent && level >= 100 ? 0.6 : 0));
+}
 function getFishingDuration() {
   const L = getFishingLevel();
-  let duration = 25000 / (1 + L / 100);
+  let duration = 25000 / getFishingSpeedFactor(L);
   if (L >= 30) duration -= 1000;
   if (L >= 50) duration -= 2000;
   return Math.max(1000, duration);
@@ -183,10 +187,10 @@ function ensureFishingTechnique() {
   if (!Array.isArray(player.techniques)) player.techniques = [];
   let skill = getFishingTechnique();
   if (!skill) {
-    skill = { id: 'fishing', name: '渔夫', level: 0, exp: 0 };
+    skill = { id: 'fishing', name: '渔者', level: 0, exp: 0 };
     player.techniques.push(skill);
   } else {
-    skill.name = '渔夫';
+    skill.name = '渔者';
   }
   return skill;
 }
@@ -253,13 +257,13 @@ function getPaodingBladeBonus() {
 }
 function getTotalBlade() { return player.blade + getPaodingBladeBonus() + getPaodingDaoBladeBonus(); }
 
-/* 庖丁技艺的悟性加成：每 2 级 +1，25/50 级节点 +3/+5。
+/* 庖丁技艺的悟性加成：每 2 级 +1，25/50 级节点 +6/+10。
    庖丁是技艺，不是武功，没有见微知著，因此不乘 getPerLayerMult。 */
 function getPaodingCompBonus() {
   const lv = getPaodingLevel();
   let bonus = Math.floor(lv / 2);
-  if (lv >= 25) bonus += 3;
-  if (lv >= 50) bonus += 5;
+  if (lv >= 25) bonus += 6;
+  if (lv >= 50) bonus += 10;
   return bonus;
 }
 function getTotalComp() { return player.comp + getPaodingCompBonus() + getJiusiCompBonus(); }
@@ -384,6 +388,17 @@ function updateMapView() {
   if (cap) cap.style.display = storyFlags.arrivedCapital ? '' : 'none';
 }
 
+/* 京城住处：裴文秀与后院农田 */
+function updateCapitalNpcs() {
+  const showPei = !!storyFlags.arrivedCapital && !storyFlags.capitalPeiTalkDone;
+  const npc = $('npcPeiWenxiuCapital');
+  if (npc) npc.style.display = showPei ? '' : 'none';
+  const row = $('capitalResidenceNpcs');
+  if (row) row.style.display = showPei ? '' : 'none';
+  const farmBtn = $('farmOpenBtn');
+  if (farmBtn) farmBtn.style.display = (storyFlags.arrivedCapital && storyFlags.farmUnlocked) ? '' : 'none';
+}
+
 function renderMainTab() {
   const sv = $('storyView'), vv = $('villageView'), dv = $('dialogView');
   if (!sv) return;
@@ -401,6 +416,7 @@ function renderMainTab() {
   updateDepartBtn();
   updateArriveBtn();
   updateLiQianyuanNpc();
+  updateCapitalNpcs();
 }
 
 function updateSidePanel() {
@@ -446,6 +462,7 @@ const storyFlags = {
   homeTalkDone: false,
   peiAskedBreak: false,
   peiAskedLotus: false,
+  peiSparDone: false,
   peiSparWinBond: false,
   peiLeaveBond: false,
   peiStoryDone: false,
@@ -453,6 +470,8 @@ const storyFlags = {
   departUnlocked: false,
   leftVillage: false,
   arrivedCapital: false,
+  capitalPeiTalkDone: false,
+  farmUnlocked: false,
   farewellTiezhu: false,
   farewellShip: false,
   farewellDaifu: false,
@@ -645,6 +664,16 @@ function showDialogNode(id) {
     saveGame();
     renderTechniques();
     updateHillNpc();
+  }
+  if (node.unlockFarm && !storyFlags.farmUnlocked) {
+    storyFlags.capitalPeiTalkDone = true;
+    storyFlags.farmUnlocked = true;
+    if (typeof ensureFarmerTechnique === 'function') ensureFarmerTechnique();
+    if (typeof ensureFarmState === 'function') ensureFarmState();
+    updateCapitalNpcs();
+    renderTechniques();
+    updateAttrUI();
+    saveGame();
   }
   updateFishingBtn();
 
@@ -1039,6 +1068,7 @@ function confirmArrive() {
   updateMapView();
   updateArriveBtn();
   updateFishingBtn();
+  updateCapitalNpcs();
   updateTrainingUI();
   renderTechniques();
   saveGame();
@@ -1051,6 +1081,14 @@ if (npcPeiWenxiuHomeEl) {
   npcPeiWenxiuHomeEl.addEventListener('click', () => {
     if (!storyFlags.peiStoryDone || storyFlags.peiPostTalkDone || storyFlags.leftVillage) return;
     showDialogNode('peiPostStart');
+  });
+}
+
+const npcPeiWenxiuCapitalEl = $('npcPeiWenxiuCapital');
+if (npcPeiWenxiuCapitalEl) {
+  npcPeiWenxiuCapitalEl.addEventListener('click', () => {
+    if (!storyFlags.arrivedCapital || storyFlags.capitalPeiTalkDone) return;
+    showDialogNode('capitalPeiTalk');
   });
 }
 
@@ -1680,6 +1718,13 @@ function handleBondSparWin() {
     addIntel(`夏扑萤与你切磋后有所悟：${bondGains.join('、')}。`, 'good');
   }
 
+  const growth = getBondGrowth();
+  growth.root += 1;
+  growth.luck += 1;
+  growth.comp += 1;
+  addLog('夏扑萤在与你的切磋中砥砺根基：根骨 +1、定力 +1、悟性 +1。', 'win');
+  addIntel('夏扑萤在与你的切磋中砥砺根基：根骨 +1、定力 +1、悟性 +1。', 'good');
+
   player.bondXiaPuying = getBondValue() + 5;
   addLog('与夏扑萤切磋得胜，羁绊 +5。', 'win');
   addIntel('与夏扑萤切磋得胜，羁绊 +5。', 'good');
@@ -1944,6 +1989,7 @@ function completeStoryBattleEnd(id, result) {
   renderBattleIdle();
   switchTab('main');
   if (id === 'peiWenxiu') {
+    storyFlags.peiSparDone = true;
     showDialogNode(result === 'win' ? 'peiSparWin' : 'peiSparLose');
   } else if (whiteRobeWin) {
     showDialogNode('baiYiVictory');
@@ -2155,6 +2201,18 @@ function getFiveMinuteTrainingExp(skill) {
   return getSkillTrainingExpPerMinute(skill, inter, player.trainingOtherBonus) * 5;
 }
 
+function canBondTeachSkill(id) {
+  if (!id) return false;
+  const b = ensureBondChar();
+  const known = getBondKnownSkillIds();
+  if (!known.includes(id)) return false;
+  const mine = (player.skills || []).find(s => s && s.id === id);
+  if (!mine) return true;
+  const bondLv = Number(b.levels[id]) || 0;
+  const playerLv = Number(mine.level) || 1;
+  return bondLv >= playerLv;
+}
+
 function bondTeach(targetId) {
   if (!player.surname) return;
   if (battleActive()) {
@@ -2174,6 +2232,10 @@ function bondTeach(targetId) {
   }
   const known = getBondKnownSkillIds();
   if (!known.includes(targetId)) return;
+  if (!canBondTeachSkill(targetId)) {
+    showToast('对方该武功重数低于你的当前重数，无法请教');
+    return;
+  }
 
   if (!player.teachCd || typeof player.teachCd !== 'object') player.teachCd = {};
   player.teachCd[BOND_TEACH_ID] = Date.now() + BOND_TEACH_CD_MS;
@@ -2203,19 +2265,25 @@ function bondTeach(targetId) {
 
 function openBondTeachPicker() {
   if (!Array.isArray(player.skills)) player.skills = [];
-  const ids = getBondKnownSkillIds();
+  const ids = getBondKnownSkillIds().filter(canBondTeachSkill);
+  if (!ids.length) {
+    showToast('没有可请教的武功：需夏扑萤重数不低于你的当前重数');
+    return;
+  }
+  const b = ensureBondChar();
   openBondModal({
     title: '向 夏 扑 萤 请 教',
-    desc: '选择一门武功请教：未习得可直接学会，已习得可获得五分钟修炼经验。每次请教后有 1200 秒冷却。',
+    desc: '选择一门武功请教：未习得可直接学会，已习得可获得五分钟修炼经验。仅可请教夏扑萤重数不低于你的武功，每次请教后有 1200 秒冷却。',
     bodyHtml: '<div class="bond-modal-list" id="bondTeachList"></div>',
     onMount: () => {
       const list = $('bondTeachList');
       if (!list) return;
       ids.forEach(id => {
         const mine = player.skills.find(s => s && s.id === id);
+        const bondLv = Number(b.levels[id]) || 0;
         const note = mine
-          ? `已习得 · 你 ${levelToChinese(mine.level)}重 · 请教可获五分钟经验`
-          : '未习得 · 请教后直接学会';
+          ? `夏扑萤 ${levelToChinese(bondLv)}重 · 你 ${levelToChinese(mine.level)}重 · 请教可获五分钟经验`
+          : `夏扑萤 ${levelToChinese(bondLv)}重 · 未习得 · 请教后直接学会`;
         list.appendChild(makeBondModalItem(id, note, () => {
           closeBondModal();
           bondTeach(id);
@@ -2656,13 +2724,17 @@ function buildSavePayload() {
       fishingActive: !!(fishing.running || fishing.nextStartAt > 0),
       fishingDuration: getFishingDuration(),
       trainingActivity: player.trainingActivity || '',
+      farmClockMs: typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now(),
       cookingActive: !!cookingState.running,
       cookingRecipe: cookingState.recipe,
       cookingPending: cookingState.running
         ? (cookingState.pending || []).map(it => ({
+            recipe: it.recipe || '',
             fishId: it.fishId,
             weight: Number(it.weight) || 0,
-            fishQuality: it.fishQuality != null && Number.isFinite(Number(it.fishQuality)) ? Number(it.fishQuality) : null
+            fishQuality: it.fishQuality != null && Number.isFinite(Number(it.fishQuality)) ? Number(it.fishQuality) : null,
+            vegId: it.vegId || '',
+            vegQuality: it.vegQuality != null && Number.isFinite(Number(it.vegQuality)) ? Number(it.vegQuality) : null
           }))
         : []
     }
@@ -2816,8 +2888,23 @@ function loadGame() {
     if (data.storyFlags && typeof data.storyFlags === 'object') {
       Object.assign(storyFlags, data.storyFlags);
     }
+    if (typeof ensureFarmState === 'function') ensureFarmState();
+    const farmClockRef = (snap && Number.isFinite(Number(snap.farmClockMs)) && Number(snap.farmClockMs) > 0)
+      ? Number(snap.farmClockMs)
+      : savedAt;
+    if (Number.isFinite(farmClockRef) && farmClockRef > 0 && player.farm && Array.isArray(player.farm.plots)) {
+      player.farm.plots.forEach(p => {
+        if (p && p.cropId && Number(p.startAt) > 0) {
+          const elapsed = Math.max(0, farmClockRef - Number(p.startAt));
+          p.startAt = Date.now() - elapsed;
+        }
+      });
+    }
     if (getFishingTechnique() || storyFlags.fishingUnlocked) ensureFishingTechnique();
     if (getPaodingTechnique() || storyFlags.cookingUnlocked) ensurePaodingTechnique();
+    if ((typeof getFarmerTechnique === 'function' && getFarmerTechnique()) || storyFlags.farmUnlocked) {
+      if (typeof ensureFarmerTechnique === 'function') ensureFarmerTechnique();
+    }
 
     if (Array.isArray(data.intelLogs)) {
       const now = Date.now();
@@ -2871,6 +2958,7 @@ function loadGame() {
     updatePeiWenxiuHomeNpc();
     updateDepartBtn();
     updateArriveBtn();
+    updateCapitalNpcs();
     renderBag();
     renderBondPanel();
     return true;
@@ -2891,6 +2979,7 @@ function resetGame() {
     cookingState.pending = [];
     const ov = $('cookingOverlay');
     if (ov) ov.classList.remove('show');
+    if (typeof closeFarm === 'function') closeFarm();
 
     localStorage.removeItem('wuxia_save_v1');
     player.surname = '';
@@ -2905,6 +2994,7 @@ function resetGame() {
     player.skills = [];
     player.techniques = [];
     player.inventory = [];
+    player.farm = typeof defaultFarmState === 'function' ? defaultFarmState() : { plots: [] };
     player.medicineLessonCount = 0;
     player.cookCount = 0;
     player.changbing = 0;
@@ -2948,6 +3038,7 @@ function resetGame() {
     storyFlags.homeTalkDone = false;
     storyFlags.peiAskedBreak = false;
     storyFlags.peiAskedLotus = false;
+    storyFlags.peiSparDone = false;
     storyFlags.peiSparWinBond = false;
     storyFlags.peiLeaveBond = false;
     storyFlags.peiStoryDone = false;
@@ -2955,6 +3046,8 @@ function resetGame() {
     storyFlags.departUnlocked = false;
     storyFlags.leftVillage = false;
     storyFlags.arrivedCapital = false;
+    storyFlags.capitalPeiTalkDone = false;
+    storyFlags.farmUnlocked = false;
     storyFlags.farewellTiezhu = false;
     storyFlags.farewellShip = false;
     storyFlags.farewellDaifu = false;
@@ -3010,6 +3103,7 @@ function resetGame() {
     updatePeiWenxiuHomeNpc();
     updateDepartBtn();
     updateArriveBtn();
+    updateCapitalNpcs();
     renderBag();
 
     intelLogs = [];
@@ -3200,12 +3294,13 @@ function applyImportedSave(data) {
   }
   const cookOv = $('cookingOverlay');
   if (cookOv) cookOv.classList.remove('show');
+  if (typeof closeFarm === 'function') closeFarm();
 
   if (dialogTimer) { clearInterval(dialogTimer); dialogTimer = null; }
   dialogSkipFn = null;
   waitClickActive = false;
 
-  ['bagModal', 'bondModal', 'departModal', 'arriveModal', 'strategyOverlay', 'bondBattleStrategyOverlay', 'studyOverlay', 'saveTransferModal', 'saveImportConfirmModal'].forEach(id => {
+  ['bagModal', 'bondModal', 'departModal', 'arriveModal', 'farmOverlay', 'farmPickerModal', 'farmConfirmModal', 'strategyOverlay', 'bondBattleStrategyOverlay', 'studyOverlay', 'saveTransferModal', 'saveImportConfirmModal'].forEach(id => {
     const el = $(id);
     if (el) el.classList.remove('show');
   });
@@ -3487,6 +3582,7 @@ $('startBtn').addEventListener('click', () => {
   storyFlags.xuanlanLearned = false;
   storyFlags.peiAskedBreak = false;
   storyFlags.peiAskedLotus = false;
+  storyFlags.peiSparDone = false;
   storyFlags.peiSparWinBond = false;
   storyFlags.peiLeaveBond = false;
   storyFlags.peiStoryDone = false;
@@ -3494,6 +3590,8 @@ $('startBtn').addEventListener('click', () => {
   storyFlags.departUnlocked = false;
   storyFlags.leftVillage = false;
   storyFlags.arrivedCapital = false;
+  storyFlags.capitalPeiTalkDone = false;
+  storyFlags.farmUnlocked = false;
   storyFlags.farewellTiezhu = false;
   storyFlags.farewellShip = false;
   storyFlags.farewellDaifu = false;
@@ -3544,6 +3642,7 @@ $('startBtn').addEventListener('click', () => {
   player.trainingSelections = { '招式':'zhenshan', '轻功':'', '外功':'qiangshen', '内功':'tanafa' };
   player.trainingLastTick = Date.now();
   player.inventory = [];
+  player.farm = typeof defaultFarmState === 'function' ? defaultFarmState() : { plots: [] };
   player.techniques = [];
   player.bondXiaPuying = 50;
   player.bondPeiWenxiu = 0;
@@ -3580,6 +3679,7 @@ $('startBtn').addEventListener('click', () => {
   updatePeiWenxiuHomeNpc();
   updateDepartBtn();
   updateArriveBtn();
+  updateCapitalNpcs();
   switchTab('main');
 });
 

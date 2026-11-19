@@ -177,7 +177,7 @@ function buildPlayerFighter() {
     f.huomaiLayers = 1;
     f.huomaiInterval = getHuomaiLayerInterval(huoLv) * 1000;
     f.huomaiNextAt = (typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now()) + f.huomaiInterval;
-    f.huomaiRegenPerLayer = getHuomaiRegenPerLayer(getTotalMedicine());
+    f.huomaiRegenPerLayer = getHuomaiRegenPerLayer(huoLv, getTotalMedicine());
     f.huomaiSpeedPerLayer = getHuomaiSpeedPerLayer(huoLv, getTotalMedicine());
   }
   Object.defineProperty(f, 'hp', {

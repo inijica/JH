@@ -17,6 +17,33 @@ function getFishStock() {
   return stock;
 }
 
+function getVegStock() {
+  const stock = {};
+  if (typeof VEG_EFFECTS === 'undefined') return stock;
+  for (const slot of player.inventory || []) {
+    if (!VEG_EFFECTS[slot.id]) continue;
+    stock[slot.id] = (stock[slot.id] || 0) + (Number(slot.qty) || 0);
+  }
+  return stock;
+}
+
+function getCookingRecipeStock(recipeId = cookingState.recipe) {
+  const stock = getFishStock();
+  if (recipeId === 'shucaiDunyu') {
+    const vStock = getVegStock();
+    for (const vid in vStock) stock[vid] = vStock[vid];
+  }
+  return stock;
+}
+
+function getAvailableCookRecipes() {
+  const list = [COOK_RECIPES.kaoyu];
+  if (typeof storyFlags !== 'undefined' && storyFlags.farmUnlocked && COOK_RECIPES.shucaiDunyu) {
+    list.push(COOK_RECIPES.shucaiDunyu);
+  }
+  return list.filter(Boolean);
+}
+
 function getCookingStoveInfo() {
   if (typeof storyFlags !== 'undefined' && storyFlags.arrivedCapital) {
     return { name: '小宅灶台', title: '住 处 · 灶 台 烹 饪', bonus: 20 };
@@ -48,6 +75,80 @@ function consumeFishByType(fishId, count) {
   return consumed;
 }
 
+function consumeVegByType(vegId, count) {
+  const consumed = [];
+  for (let i = player.inventory.length - 1; i >= 0 && consumed.length < count; i--) {
+    const slot = player.inventory[i];
+    if (!slot || slot.id !== vegId) continue;
+    while (slot.qty > 0 && consumed.length < count) {
+      consumed.push({
+        vegId,
+        vegQuality: slot.data && slot.data.quality != null && Number.isFinite(Number(slot.data.quality))
+          ? Number(slot.data.quality)
+          : 100
+      });
+      slot.qty--;
+    }
+    if (slot.qty <= 0) player.inventory.splice(i, 1);
+  }
+  renderBag();
+  return consumed;
+}
+
+function shuffleCookingArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
+}
+
+/* 从库存字典 stock 中随机均匀不放回抽取 pickCount 个物品 ID，返回 { id: count } */
+function pickRandomStockCounts(stock, pickCount) {
+  const entries = Object.entries(stock)
+    .map(([id, cnt]) => ({ id, rem: Math.max(0, Math.floor(Number(cnt) || 0)) }))
+    .filter(e => e.rem > 0);
+  const total = entries.reduce((sum, e) => sum + e.rem, 0);
+  if (pickCount <= 0 || total <= 0) return {};
+  if (pickCount >= total) {
+    const all = {};
+    for (const e of entries) all[e.id] = e.rem;
+    return all;
+  }
+
+  /* 当需要抽取的数量超过一半时，反向抽取要排除的数量，确保在大库存下也只需极少次数 */
+  const invert = pickCount > total / 2;
+  const draws = invert ? (total - pickCount) : pickCount;
+  const picked = {};
+  let remTotal = total;
+
+  for (let k = 0; k < draws; k++) {
+    let r = Math.floor(Math.random() * remTotal);
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      if (e.rem <= 0) continue;
+      if (r < e.rem) {
+        e.rem--;
+        remTotal--;
+        picked[e.id] = (picked[e.id] || 0) + 1;
+        break;
+      }
+      r -= e.rem;
+    }
+  }
+
+  if (invert) {
+    const res = {};
+    for (const e of entries) {
+      if (e.rem > 0) res[e.id] = e.rem;
+    }
+    return res;
+  }
+  return picked;
+}
+
 const COOK_DIFFICULTY_SCALE = 1.2;
 
 function calcCookQuality(level, stoveBonus) {
@@ -63,11 +164,12 @@ function calcCookQuality(level, stoveBonus) {
   return Math.max(0, ((inner + baodi) * (1 + 0.01 * level) + fixed) * mult * last * COOK_DIFFICULTY_SCALE);
 }
 
+/* 烤鱼：+1 起每 +1 提升 10%（加算） */
 function getCookTier(quality) {
   if (quality <= 20) return { prefix: '烤糊的', suffix: '', effectMult: 0.75, tier: 'burnt' };
   if (quality <= 50) return { prefix: '半焦的', suffix: '', effectMult: 0.9, tier: 'half' };
   const extra = Math.max(0, Math.floor((quality - 51) / 100));
-  return { prefix: '烤', suffix: extra > 0 ? '+' + extra : '', effectMult: 1.2 + 0.1 * Math.sqrt(Math.max(0, quality - 51)) / 10, tier: 'cooked' };
+  return { prefix: '烤', suffix: extra > 0 ? '+' + extra : '', effectMult: 1.2 + 0.1 * extra, tier: 'cooked' };
 }
 
 function buildCookedName(fishName, tier) {
@@ -76,14 +178,59 @@ function buildCookedName(fishName, tier) {
   return '烤' + fishName + tier.suffix;
 }
 
+/* 蔬菜炖鱼品质分段 */
+function getStewTier(quality) {
+  if (quality <= 70) return { tier: 'unknown', suffix: '', effectMult: 0.5 };
+  if (quality <= 140) return { tier: 'charred', suffix: '', effectMult: 0.8 };
+  if (quality <= 200) return { tier: 'plain', suffix: '', effectMult: 1.1 };
+  if (quality <= 350) return { tier: 'normal', suffix: '', effectMult: 1.3 };
+  const extra = Math.max(0, Math.floor((quality - 351) / 150));
+  return { tier: 'master', suffix: extra > 0 ? '+' + extra : '', effectMult: 1.5 + 0.25 * extra };
+}
+
+function buildStewName(vegName, fishName, tier) {
+  if (tier.tier === 'unknown') return '不知名物体';
+  if (tier.tier === 'charred') return `焦黑的${vegName}炖${fishName}`;
+  if (tier.tier === 'plain') return `平平无奇的${vegName}炖${fishName}`;
+  if (tier.tier === 'normal') return `${vegName}炖${fishName}`;
+  return `霜蔬煨锦鳞${tier.suffix}`;
+}
+
+function renderIngredientRows(ids, stock) {
+  return ids.map(id => {
+    const def = ITEM_DEFS[id];
+    const total = stock[id];
+    const sel = cookingState.selected[id] || 0;
+    return `<div class="ingredient-item">
+      <div>
+        <div class="ing-name">${escapeHtml(def.name)}</div>
+        <div class="ing-stock">库存 ${total}</div>
+      </div>
+      <div class="ing-ctrl">
+        <button type="button" data-ing="${id}" data-dir="-1" ${sel <= 0 ? 'disabled' : ''}>−</button>
+        <span class="ing-qty">${sel}</span>
+        <button type="button" data-ing="${id}" data-dir="1" ${sel >= total ? 'disabled' : ''}>+</button>
+        <button type="button" class="ing-all" data-ing="${id}" data-dir="all" ${sel >= total ? 'disabled' : ''}>全部</button>
+        <button type="button" class="ing-cancel" data-ing="${id}" data-dir="cancel" ${sel <= 0 ? 'disabled' : ''}>取消</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderCookingUI() {
+  const recipes = getAvailableCookRecipes();
+  if (!recipes.some(r => r.id === cookingState.recipe)) {
+    cookingState.recipe = recipes[0] ? recipes[0].id : 'kaoyu';
+  }
+
   const recipeEl = $('cookingRecipeList');
   if (recipeEl) {
-    const recipe = COOK_RECIPES[cookingState.recipe];
-    recipeEl.innerHTML = `<div class="recipe-item active">
-      <div>${recipe.name}</div>
-      <div class="recipe-item-desc">${recipe.desc}<br>需求：鱼类 ×1</div>
-    </div>`;
+    recipeEl.innerHTML = recipes.map(r => `
+      <div class="recipe-item${r.id === cookingState.recipe ? ' active' : ''}" data-recipe="${r.id}">
+        <div>${escapeHtml(r.name)}</div>
+        <div class="recipe-item-desc">${escapeHtml(r.desc)}<br>${escapeHtml(r.reqDesc || '需求：鱼类 ×1')}</div>
+      </div>
+    `).join('');
   }
 
   const stove = getCookingStoveInfo();
@@ -101,38 +248,60 @@ function renderCookingUI() {
 
   const ingEl = $('cookingIngredientList');
   if (ingEl) {
-    const stock = getFishStock();
-    const ids = Object.keys(stock).filter(id => stock[id] > 0);
-    if (!ids.length) {
-      ingEl.innerHTML = '<div class="ing-empty">背包里没有可用的鱼类食材</div>';
-    } else {
-      ingEl.innerHTML = ids.map(id => {
-        const def = ITEM_DEFS[id];
-        const total = stock[id];
-        const sel = cookingState.selected[id] || 0;
-        return `<div class="ingredient-item">
-          <div>
-            <div class="ing-name">${escapeHtml(def.name)}</div>
-            <div class="ing-stock">库存 ${total}</div>
-          </div>
-          <div class="ing-ctrl">
-            <button type="button" data-fish="${id}" data-dir="-1" ${sel <= 0 ? 'disabled' : ''}>−</button>
-            <span class="ing-qty">${sel}</span>
-            <button type="button" data-fish="${id}" data-dir="1" ${sel >= total ? 'disabled' : ''}>+</button>
-            <button type="button" class="ing-all" data-fish="${id}" data-dir="all" ${sel >= total ? 'disabled' : ''}>全部</button>
-            <button type="button" class="ing-cancel" data-fish="${id}" data-dir="cancel" ${sel <= 0 ? 'disabled' : ''}>取消</button>
-          </div>
+    const fishStock = getFishStock();
+    const fishIds = Object.keys(fishStock).filter(id => fishStock[id] > 0);
+
+    if (cookingState.recipe === 'shucaiDunyu') {
+      const vegStock = getVegStock();
+      const vegIds = Object.keys(vegStock).filter(id => vegStock[id] > 0);
+      if (!fishIds.length && !vegIds.length) {
+        ingEl.innerHTML = '<div class="ing-empty">背包里没有可用的鱼类或蔬菜食材</div>';
+      } else {
+        let html = '';
+        html += '<div class="ing-group-title">鱼 类</div>';
+        html += fishIds.length
+          ? renderIngredientRows(fishIds, fishStock)
+          : '<div class="ing-empty" style="padding:10px 0">暂无可用鱼类</div>';
+        html += '<div class="ing-group-title">蔬 菜</div>';
+        html += vegIds.length
+          ? renderIngredientRows(vegIds, vegStock)
+          : '<div class="ing-empty" style="padding:10px 0">暂无可用蔬菜</div>';
+        const hasSelected = Object.values(cookingState.selected).some(v => v > 0);
+        const canFill = fishIds.length > 0 && vegIds.length > 0;
+        html += `<div class="ing-footer">
+          <button type="button" class="ing-clear ing-fill" id="cookingFillAllBtn" ${canFill ? '' : 'disabled'}>投 入 全 部</button>
+          <button type="button" class="ing-clear" id="cookingClearAllBtn" ${hasSelected ? '' : 'disabled'}>清 空 食 材</button>
         </div>`;
-      }).join('');
-      const hasSelected = Object.values(cookingState.selected).some(v => v > 0);
-      ingEl.innerHTML += `<div class="ing-footer">
-        <button type="button" class="ing-clear ing-fill" id="cookingFillAllBtn">投 入 全 部</button>
-        <button type="button" class="ing-clear" id="cookingClearAllBtn" ${hasSelected ? '' : 'disabled'}>清 空 食 材</button>
-      </div>`;
+        ingEl.innerHTML = html;
+      }
+    } else {
+      if (!fishIds.length) {
+        ingEl.innerHTML = '<div class="ing-empty">背包里没有可用的鱼类食材</div>';
+      } else {
+        let html = renderIngredientRows(fishIds, fishStock);
+        const hasSelected = Object.values(cookingState.selected).some(v => v > 0);
+        html += `<div class="ing-footer">
+          <button type="button" class="ing-clear ing-fill" id="cookingFillAllBtn">投 入 全 部</button>
+          <button type="button" class="ing-clear" id="cookingClearAllBtn" ${hasSelected ? '' : 'disabled'}>清 空 食 材</button>
+        </div>`;
+        ingEl.innerHTML = html;
+      }
     }
   }
 
   updateCookingUI();
+}
+
+function getSelectedCountsByKind() {
+  let fishCount = 0;
+  let vegCount = 0;
+  for (const id in cookingState.selected) {
+    const qty = Number(cookingState.selected[id]) || 0;
+    if (qty <= 0) continue;
+    if (FISH_EFFECTS[id]) fishCount += qty;
+    else if (typeof VEG_EFFECTS !== 'undefined' && VEG_EFFECTS[id]) vegCount += qty;
+  }
+  return { fishCount, vegCount };
 }
 
 function updateCookingUI() {
@@ -143,10 +312,20 @@ function updateCookingUI() {
   }
   const statusEl = $('cookingStatusText');
   if (statusEl && !cookingState.running) {
-    const total = Object.values(cookingState.selected).reduce((a, b) => a + b, 0);
-    statusEl.textContent = total > 0
-      ? `已选择 ${total} 条鱼，点击开始烹饪`
-      : '选择食材后点击烹饪';
+    const { fishCount, vegCount } = getSelectedCountsByKind();
+    if (cookingState.recipe === 'shucaiDunyu') {
+      if (fishCount <= 0 && vegCount <= 0) {
+        statusEl.textContent = '选择 1:1 数量的鱼类与蔬菜后点击烹饪';
+      } else if (fishCount === vegCount && fishCount > 0) {
+        statusEl.textContent = `已选择 鱼类 ${fishCount} 条 / 蔬菜 ${vegCount} 份（可炖制 ${fishCount} 份），点击开始烹饪`;
+      } else {
+        statusEl.textContent = `已选择 鱼类 ${fishCount} 条 / 蔬菜 ${vegCount} 份（需保持 1:1 数量配对）`;
+      }
+    } else {
+      statusEl.textContent = fishCount > 0
+        ? `已选择 ${fishCount} 条鱼，点击开始烹饪`
+        : '选择食材后点击烹饪';
+    }
   }
 }
 
@@ -154,6 +333,9 @@ function openCooking() {
   cookingState.selected = {};
   cookingState.running = false;
   cookingState.pending = [];
+  if (cookingState.recipe === 'shucaiDunyu' && !(typeof storyFlags !== 'undefined' && storyFlags.farmUnlocked)) {
+    cookingState.recipe = 'kaoyu';
+  }
   const fill = $('cookingProgressFill');
   if (fill) fill.style.width = '0%';
   renderCookingUI();
@@ -173,24 +355,94 @@ function startCooking() {
   const recipe = COOK_RECIPES[cookingState.recipe];
   if (!recipe) return;
 
-  const stock = getFishStock();
-  const plan = [];
-  for (const fishId in cookingState.selected) {
-    const cnt = Math.min(cookingState.selected[fishId] || 0, stock[fishId] || 0);
-    if (cnt > 0) plan.push({ fishId, count: cnt });
-  }
-  if (!plan.length) {
-    showToast('请先选择食材');
-    return;
+  if (cookingState.recipe === 'shucaiDunyu') {
+    const fishStock = getFishStock();
+    const vegStock = getVegStock();
+    const fishPlan = [];
+    const vegPlan = [];
+    let fishTotal = 0;
+    let vegTotal = 0;
+
+    for (const id in cookingState.selected) {
+      const want = Number(cookingState.selected[id]) || 0;
+      if (want <= 0) continue;
+      if (FISH_EFFECTS[id]) {
+        const cnt = Math.min(want, fishStock[id] || 0);
+        if (cnt > 0) { fishPlan.push({ fishId: id, count: cnt }); fishTotal += cnt; }
+      } else if (typeof VEG_EFFECTS !== 'undefined' && VEG_EFFECTS[id]) {
+        const cnt = Math.min(want, vegStock[id] || 0);
+        if (cnt > 0) { vegPlan.push({ vegId: id, count: cnt }); vegTotal += cnt; }
+      }
+    }
+
+    if (fishTotal <= 0 || vegTotal <= 0) {
+      showToast('请同时选择鱼类与蔬菜食材');
+      return;
+    }
+    if (fishTotal !== vegTotal) {
+      showToast('蔬菜炖鱼需要鱼类与蔬菜保持 1:1 数量配对');
+      return;
+    }
+
+    const fishPool = [];
+    const vegPool = [];
+    _bagRenderSuppress++;
+    try {
+      for (const p of fishPlan) {
+        const items = consumeFishByType(p.fishId, p.count);
+        for (const it of items) fishPool.push(it);
+      }
+      for (const p of vegPlan) {
+        const items = consumeVegByType(p.vegId, p.count);
+        for (const it of items) vegPool.push(it);
+      }
+    } finally {
+      _bagRenderSuppress--;
+    }
+    renderBag();
+
+    shuffleCookingArray(fishPool);
+    shuffleCookingArray(vegPool);
+    const pairCount = Math.min(fishPool.length, vegPool.length);
+    const pending = [];
+    for (let i = 0; i < pairCount; i++) {
+      pending.push({
+        recipe: 'shucaiDunyu',
+        fishId: fishPool[i].fishId,
+        weight: fishPool[i].weight,
+        fishQuality: fishPool[i].fishQuality,
+        vegId: vegPool[i].vegId,
+        vegQuality: vegPool[i].vegQuality
+      });
+    }
+    cookingState.pending = pending;
+  } else {
+    const stock = getFishStock();
+    const plan = [];
+    for (const fishId in cookingState.selected) {
+      if (!FISH_EFFECTS[fishId]) continue;
+      const cnt = Math.min(cookingState.selected[fishId] || 0, stock[fishId] || 0);
+      if (cnt > 0) plan.push({ fishId, count: cnt });
+    }
+    if (!plan.length) {
+      showToast('请先选择食材');
+      return;
+    }
+
+    const consumed = [];
+    _bagRenderSuppress++;
+    try {
+      for (const p of plan) {
+        const items = consumeFishByType(p.fishId, p.count);
+        for (const it of items) consumed.push(it);
+      }
+    } finally {
+      _bagRenderSuppress--;
+    }
+    renderBag();
+    cookingState.pending = consumed;
   }
 
-  const consumed = [];
-  for (const p of plan) {
-    const items = consumeFishByType(p.fishId, p.count);
-    for (const it of items) consumed.push(it);
-  }
-
-  cookingState.pending = consumed;
   cookingState.running = true;
   cookingState.startAt = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
 
@@ -201,7 +453,7 @@ function startCooking() {
 
 function cookingLoop() {
   if (!cookingState.running) return;
-  const recipe = COOK_RECIPES[cookingState.recipe];
+  const recipe = COOK_RECIPES[cookingState.recipe] || COOK_RECIPES.kaoyu;
   const now = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
   const elapsed = now - cookingState.startAt;
   const pct = Math.min(100, elapsed / recipe.duration * 100);
@@ -222,6 +474,7 @@ function startCookingEngine() {
 function finishCooking() {
   const items = cookingState.pending || [];
   cookingState.pending = [];
+  const recipeId = cookingState.recipe;
 
   const stoveBonus = getCookingStoveInfo().bonus;
   const results = [];
@@ -233,21 +486,49 @@ function finishCooking() {
     for (const it of items) {
       const level = getPaodingLevel();
       const quality = calcCookQuality(level, stoveBonus);
-      const tier = getCookTier(quality);
-      const fishName = ITEM_DEFS[it.fishId] ? ITEM_DEFS[it.fishId].name : '鱼';
-      const name = buildCookedName(fishName, tier);
-      const itemData = {
-        fishId: it.fishId,
-        fishName,
-        weight: it.weight,
-        fishQuality: it.fishQuality,
-        quality,
-        name,
-        effectMult: tier.effectMult
-      };
-      addItem('kaoyu', 1, itemData);
-      const exp = (10 + quality * 0.12) * (1 + quality * 0.0008) * getPaodingExpMultiplier();
-      results.push({ name, quality, exp });
+      const isStew = it.recipe === 'shucaiDunyu' || (recipeId === 'shucaiDunyu' && it.vegId);
+
+      let outItemId = 'kaoyu';
+      let itemData;
+      let expMult = 1;
+
+      if (isStew && it.vegId) {
+        const tier = getStewTier(quality);
+        const fishName = ITEM_DEFS[it.fishId] ? ITEM_DEFS[it.fishId].name : '鱼';
+        const vegName = ITEM_DEFS[it.vegId] ? ITEM_DEFS[it.vegId].name : '菜';
+        const name = buildStewName(vegName, fishName, tier);
+        outItemId = 'shucaiDunyu';
+        expMult = 1.75;
+        itemData = {
+          fishId: it.fishId,
+          fishName,
+          weight: it.weight,
+          fishQuality: it.fishQuality,
+          vegId: it.vegId,
+          vegName,
+          vegQuality: it.vegQuality,
+          quality,
+          name,
+          effectMult: tier.effectMult
+        };
+      } else {
+        const tier = getCookTier(quality);
+        const fishName = ITEM_DEFS[it.fishId] ? ITEM_DEFS[it.fishId].name : '鱼';
+        const name = buildCookedName(fishName, tier);
+        itemData = {
+          fishId: it.fishId,
+          fishName,
+          weight: it.weight,
+          fishQuality: it.fishQuality,
+          quality,
+          name,
+          effectMult: tier.effectMult
+        };
+      }
+
+      addItem(outItemId, 1, itemData);
+      const exp = (10 + quality * 0.12) * (1 + quality * 0.0008) * getPaodingExpMultiplier() * expMult;
+      results.push({ name: itemData.name, quality, exp });
 
       t.exp = (Number(t.exp) || 0) + exp;
       let guard = 0;
@@ -259,8 +540,8 @@ function finishCooking() {
 
       const dblChance = getPaodingDoubleChance();
       if (dblChance > 0 && Math.random() < dblChance) {
-        addItem('kaoyu', 1, { ...itemData });
-        results.push({ name, quality, exp: 0, double: true });
+        addItem(outItemId, 1, { ...itemData });
+        results.push({ name: itemData.name, quality, exp: 0, double: true });
       }
     }
   } finally {
@@ -299,6 +580,20 @@ function finishCooking() {
 }
 
 const cookingRecipeListEl = $('cookingRecipeList');
+if (cookingRecipeListEl) {
+  cookingRecipeListEl.addEventListener('click', (e) => {
+    if (cookingState.running) return;
+    const item = e.target.closest('.recipe-item[data-recipe]');
+    if (!item) return;
+    const id = item.dataset.recipe;
+    if (!COOK_RECIPES[id] || id === cookingState.recipe) return;
+    if (id === 'shucaiDunyu' && !(typeof storyFlags !== 'undefined' && storyFlags.farmUnlocked)) return;
+    cookingState.recipe = id;
+    cookingState.selected = {};
+    renderCookingUI();
+  });
+}
+
 const cookingIngredientListEl = $('cookingIngredientList');
 const cookingStartBtnEl = $('cookingStartBtn');
 const cookingCloseBtnEl = $('cookingCloseBtn');
@@ -308,12 +603,26 @@ if (cookingIngredientListEl) {
   cookingIngredientListEl.addEventListener('click', (e) => {
     if (cookingState.running) return;
     if (e.target.closest('#cookingFillAllBtn')) {
-      const fillStock = getFishStock();
-      const next = {};
-      for (const fid in fillStock) {
-        if (fillStock[fid] > 0) next[fid] = fillStock[fid];
+      const fishStock = getFishStock();
+      if (cookingState.recipe === 'shucaiDunyu') {
+        const vegStock = getVegStock();
+        const fishTotal = Object.values(fishStock).reduce((a, b) => a + b, 0);
+        const vegTotal = Object.values(vegStock).reduce((a, b) => a + b, 0);
+        const pairCount = Math.min(fishTotal, vegTotal);
+        if (pairCount <= 0) {
+          showToast('需要同时拥有鱼类与蔬菜才能 1:1 配对');
+          return;
+        }
+        const pickedFish = pickRandomStockCounts(fishStock, pairCount);
+        const pickedVeg = pickRandomStockCounts(vegStock, pairCount);
+        cookingState.selected = Object.assign({}, pickedFish, pickedVeg);
+      } else {
+        const next = {};
+        for (const fid in fishStock) {
+          if (fishStock[fid] > 0) next[fid] = fishStock[fid];
+        }
+        cookingState.selected = next;
       }
-      cookingState.selected = next;
       renderCookingUI();
       return;
     }
@@ -322,22 +631,22 @@ if (cookingIngredientListEl) {
       renderCookingUI();
       return;
     }
-    const btn = e.target.closest('button[data-fish]');
+    const btn = e.target.closest('button[data-ing]');
     if (!btn) return;
-    const fishId = btn.dataset.fish;
+    const ingId = btn.dataset.ing;
     const dirRaw = btn.dataset.dir;
     if (dirRaw === 'cancel') {
-      delete cookingState.selected[fishId];
+      delete cookingState.selected[ingId];
       renderCookingUI();
       return;
     }
-    const stock = getFishStock()[fishId] || 0;
-    const cur = cookingState.selected[fishId] || 0;
+    const stock = getCookingRecipeStock()[ingId] || 0;
+    const cur = cookingState.selected[ingId] || 0;
     let next = dirRaw === 'all' ? stock : cur + parseInt(dirRaw);
     if (next < 0) next = 0;
     if (next > stock) next = stock;
-    if (next === 0) delete cookingState.selected[fishId];
-    else cookingState.selected[fishId] = next;
+    if (next === 0) delete cookingState.selected[ingId];
+    else cookingState.selected[ingId] = next;
     renderCookingUI();
   });
 }

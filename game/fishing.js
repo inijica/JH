@@ -30,6 +30,23 @@ function resetFishingBtn() {
   }
 }
 
+function getFishingDoubleChance(level = getFishingLevel()) {
+  const L = Math.max(0, Number(level) || 0);
+  return L >= 50 ? Math.min(1, Math.max(0, L - 20) / 100) : 0;
+}
+
+/* 渔者 Lv.100 突破：边修炼边钓鱼时读条速度减算 60%，实时平滑重算剩余时间 */
+function syncFishingConcurrentDuration() {
+  if (!fishing.running) return;
+  const now = typeof getGameClockMs === 'function' ? getGameClockMs() : Date.now();
+  const oldDur = Math.max(1000, Number(fishing.duration) || 1000);
+  const newDur = getFishingDuration();
+  if (Math.abs(oldDur - newDur) < 1) return;
+  const pct = Math.min(1, Math.max(0, (now - fishing.startAt) / oldDur));
+  fishing.duration = newDur;
+  fishing.startAt = now - pct * newDur;
+}
+
 function startFishing(plannedStartAt) {
   if (fishing.running) return;
   if (!canFishHere()) return;
@@ -204,7 +221,7 @@ function rollFishingCatch() {
   }
 
   const lucky = Math.random() < 0.001;
-  const dblChance = L >= 50 ? Math.min(1, Math.max(0, L - 20) / 100) : 0;
+  const dblChance = getFishingDoubleChance(L);
   const rewardCount = (dblChance > 0 && Math.random() < dblChance) ? 2 : 1;
   const result = { type: 'catch', Q, category, itemId, lucky, rewardCount };
 

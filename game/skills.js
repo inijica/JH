@@ -88,8 +88,9 @@ function getWangbaRootBonus(level) {
 }
 
 function getTotalRoot() {
+  const farmerRoot = typeof getFarmerRootBonus === 'function' ? getFarmerRootBonus() : 0;
   return player.root + getWangbaRootBonus(getWangbaLevel()) + getQiangshenRootBonus(getQiangshenLevel()) +
-    getFeishipoRootBonus() + getHuomaiRootBonus();
+    getFeishipoRootBonus() + getHuomaiRootBonus() + farmerRoot;
 }
 
 function getFistBonus() {

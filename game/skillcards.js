@@ -34,7 +34,7 @@ const SKILL_CARD_BUILDERS = {
   zhenshan: (s, lv) => {
     const st = getWangbaStats(lv);
     const zsMult = getPerLayerMult(getMartialSkillById('zhenshan'));
-    const perLayerFist = Math.round(3 * zsMult);
+    const perLayerFist = fmtBondStat(3 * zsMult);
     const perLayer = HANSHAN_CON_PER_LAYER * (lv >= 100 ? 2 : 1) * getTotalCon();
     const rows = `
       <div class="skill-card-row">类型：<b>${s.type}</b></div>
@@ -51,7 +51,7 @@ const SKILL_CARD_BUILDERS = {
   jiusi: (s, lv) => {
     const st = getJiusiStats(lv);
     const jsMult = getPerLayerMult(getMartialSkillById('jiusi'));
-    const perLayerSword = Math.round(3 * jsMult);
+    const perLayerSword = fmtBondStat(3 * jsMult);
     const rows = `
       <div class="skill-card-row">类型：<b>${s.type}</b></div>
       <div class="skill-card-intro">九思而后动，剑出如思量。一退一进之间，剑意自生。</div>
@@ -71,7 +71,7 @@ const SKILL_CARD_BUILDERS = {
     const pd = getPaodingLevel();
     const youren = getPaodingDaoYourenPerLayer(lv);
     const pdMult = getPerLayerMult(getMartialSkillById('paodingDao'));
-    const perLayerBlade = Math.round(3 * pdMult);
+    const perLayerBlade = fmtBondStat(3 * pdMult);
     const rows = `
       <div class="skill-card-row">类型：<b>${s.type}</b></div>
       <div class="skill-card-intro">烹饪百道，刀工火候间自成刀法。游刃于筋骨之间，不见全牛。</div>
@@ -88,7 +88,7 @@ const SKILL_CARD_BUILDERS = {
   feishipo: (s, lv) => {
     const st = getFeishipoStats(lv);
     const fsMult = getPerLayerMult(getMartialSkillById('feishipo'));
-    const perLayerHidden = Math.round(3 * fsMult);
+    const perLayerHidden = fmtBondStat(3 * fsMult);
     const rows = `
       <div class="skill-card-row">类型：<b>${s.type}</b></div>
       <div class="skill-card-intro">夏扑萤用来打果子的手段，指间石子一弹即出，破空无声。</div>
@@ -104,7 +104,7 @@ const SKILL_CARD_BUILDERS = {
 
   qiangshen: (s, lv) => {
     const qsMult = getPerLayerMult(getMartialSkillById('qiangshen'));
-    const perLayerCon = Math.round(2 * qsMult);
+    const perLayerCon = fmtBondStat(2 * qsMult);
     const rows = `
       <div class="skill-card-row">类型：<b>${s.type}</b></div>
       <div class="skill-card-intro">以铁匠锤锻之法熬炼筋骨，一锤一火皆入皮肉。炉火不熄，肉身不坏。</div>
@@ -117,14 +117,16 @@ const SKILL_CARD_BUILDERS = {
     const layers = 5;
     const hmMult = getPerLayerMult(getMartialSkillById('huomai'));
     const hmPerLevelRate = HUOMAI_RATE_PER_LEVEL * hmMult;
+    const perLevelMed = 5 * hmMult;
+    const perFiveRoot = 1 * hmMult;
     const rows = `
       <div class="skill-card-row">类型：<b>${s.type}</b></div>
       <div class="skill-card-intro">以针理脉，以脉养气。血行无碍，气自生焉。</div>
       <div class="skill-card-row">首重内力增速：<b>${rowRate(HUOMAI_RATE_BASE)}/分钟</b></div>
-      <div class="skill-card-row">每一重提升：内力增速 <b>+${rowRate(hmPerLevelRate)}/分钟</b>、医术 <b>+5</b></div>
-      <div class="skill-card-row">每五重提升：根骨 <b>+1</b></div>
+      <div class="skill-card-row">每一重提升：内力增速 <b>+${rowRate(hmPerLevelRate)}/分钟</b>、医术 <b>+${fmtBondStat(perLevelMed)}</b></div>
+      <div class="skill-card-row">每五重提升：根骨 <b>+${fmtBondStat(perFiveRoot)}</b></div>
       <div class="skill-card-row">当前内力增速：<b>${rowRate(getHuomaiRatePerMin(lv))}/分钟</b>　当前医术：<b>${fmtBondStat(getTotalMedicine())}</b></div>
-      <div class="skill-card-row">活脉：<b>${lv >= layers ? `战斗中每 ${getHuomaiLayerInterval(lv)} 秒一层，每层每秒恢复 ${fmtBondStat(getHuomaiRegenPerLayer())} 气血` : `五重解锁`}</b>${lv >= 50 ? `<br>每层行动速度 <b>+${fmtBondStat(getHuomaiSpeedPerLayer(lv))}</b>` : ''}</div>`;
+      <div class="skill-card-row">活脉：<b>${lv >= layers ? `战斗中每 ${getHuomaiLayerInterval(lv)} 秒一层，每层每秒恢复 ${fmtBondStat(getHuomaiRegenPerLayer(lv))} 气血` : `五重解锁`}</b>${lv >= 50 ? `<br>每层行动速度 <b>+${fmtBondStat(getHuomaiSpeedPerLayer(lv))}</b>` : ''}</div>`;
     return { rows, unlockHtml: renderUnlockList(HUOMAI_UNLOCKS, lv) };
   },
 
@@ -145,13 +147,13 @@ const SKILL_CARD_BUILDERS = {
   },
 
   qingyuan: (s, lv) => {
-    const acc = lv * 0.0075;
-    const eva = lv * 0.01 + (lv >= 25 ? 0.1 : 0);
-    const spd = lv * 0.02 + getQingyuanSpeedBonus(lv);
     const qyMult = getPerLayerMult(getMartialSkillById('qingyuan'));
     const perSpd = 0.02 * qyMult;
     const perAcc = 0.0075 * qyMult;
     const perEva = 0.01 * qyMult;
+    const acc = lv * perAcc;
+    const eva = lv * perEva + (lv >= 25 ? 0.1 : 0);
+    const spd = lv * perSpd + getQingyuanSpeedBonus(lv);
     const rows = `
       <div class="skill-card-row">类型：<b>${s.type}</b></div>
       <div class="skill-card-intro">青者天之远色，鸢者风之捷影。举步不沾尘，回身已过数丈——非身轻也，乃心先至耳。</div>
@@ -320,29 +322,27 @@ function buildFishingTechniqueCard() {
   if (!skill) return '';
   const lv = Math.max(0, Number(skill.level) || 0);
   const need = getFishingExpNeed(lv);
-  const fixed = getFishingQualityFixed(lv);
-  const qualityRate = getFishingQualityMultiplier(lv);
+  const dblChance = typeof getFishingDoubleChance === 'function'
+    ? getFishingDoubleChance(lv)
+    : (lv >= 50 ? Math.min(1, Math.max(0, lv - 20) / 100) : 0);
   const unlocks = [
     { level: 5,   desc: '钓鱼品质固定 +10' },
-    { level: 10,  desc: '定力 +1，钓鱼品质提升 10%' },
+    { level: 10,  desc: '定力 +2，钓鱼品质提升 10%' },
     { level: 20,  desc: '钓鱼品质固定 +35' },
-    { level: 30,  desc: '定力 +5，钓鱼品质再次提升 20%，钓鱼时间 -1s' },
-    { level: 50,  desc: '每次钓鱼有 [渔夫等级-20]% 概率双倍产出，钓鱼时间 -2s' },
-    { level: 70,  desc: '定力 +15，钓鱼品质再次提升 50%' },
-    { level: 100, desc: '可以在钓鱼的过程中进行别的行动' },
-    { level: 125, desc: '获得特质【沉渊】：敌人行动速度减少，减少值相当于渔夫等级/100' }
+    { level: 30,  desc: '定力 +10，钓鱼品质再次提升 20%，钓鱼时间 -1s' },
+    { level: 50,  desc: '每次钓鱼有 [渔者等级-20]% 概率双倍产出，钓鱼时间 -2s' },
+    { level: 70,  desc: '定力 +30，钓鱼品质再次提升 50%' },
+    { level: 100, desc: '可以在钓鱼过程中进行别的行动，但是会降低 60% 的钓鱼读条速度（减算）' },
+    { level: 125, desc: '获得特质【沉渊】：敌人行动速度减少，减少值相当于渔者等级/100' }
   ];
   const unlockHtml = unlocks.map(u => `<div class="unlock-item ${lv >= u.level ? 'unlocked' : ''}"><span class="unlock-lv">Lv.${u.level}</span><span class="unlock-desc">${u.desc}</span></div>`).join('');
-  const speed = 100 + lv;
-  const luckBonus = getFishingLuckBonus(lv);
   return `<div class="skill-card">
-    <div class="skill-card-name">渔夫（Lv.${lv}）</div>
+    <div class="skill-card-name">渔者（Lv.${lv}）</div>
     <div class="skill-card-row">升级经验：<b>${Math.round(skill.exp || 0)} / ${Math.round(need)}</b></div>
     <div class="skill-exp"><div class="skill-exp-fill" style="width:${Math.min(100, (skill.exp || 0) / need * 100)}%"></div></div>
     <div class="skill-train-meta">每级提升：钓鱼品质提升，钓鱼时间缩短　每2级定力 +1</div>
-    <div class="skill-card-row">当前品质加成：<b>固定 +${fixed}，倍率 ×${qualityRate.toFixed(2)}</b></div>
     <div class="skill-card-row">经验倍率：<b>×${getFishingExpMultiplier().toFixed(2)}</b></div>
-    <div class="skill-card-row">当前定力加成：<b>+${luckBonus}</b>　读条速度：<b>${speed}%</b></div>
+    <div class="skill-card-row">当前双倍产出概率：<b>${formatPercent(dblChance)}</b></div>
     <div class="skill-card-row">当前钓鱼时间：<b>${(getFishingDuration()/1000).toFixed(2)} 秒</b></div>
     <div class="skill-unlocks"><div class="unlock-title">突 破 节 点</div>${unlockHtml}</div>
   </div>`;
@@ -356,22 +356,52 @@ function buildPaodingTechniqueCard() {
   const unlocks = [
     { level: 5,   desc: '烹饪品质固定 +10' },
     { level: 10,  desc: '烹饪品质 +5%，刀法 +5' },
-    { level: 25,  desc: '悟性 +3，刀法 +15，烹饪品质固定 +30' },
-    { level: 50,  desc: '悟性 +5，刀法 +25，烹饪品质 +20%，每次烹饪有 [庖丁等级-20]% 概率双倍产出' },
+    { level: 25,  desc: '悟性 +6，刀法 +15，烹饪品质固定 +30' },
+    { level: 50,  desc: '悟性 +10，刀法 +25，烹饪品质 +20%，每次烹饪有 [庖丁等级-20]% 概率双倍产出' },
     { level: 75,  desc: '烹饪品质固定 +100，烹饪品质 +35%' },
     { level: 100, desc: '获得特质【解牛】：战斗中每 2 秒给敌人叠加一层破绽，敌人每次受到伤害时消耗一层，造成（庖丁等级 × 体魄 / 10）的固定伤害' }
   ];
   const unlockHtml = unlocks.map(u => `<div class="unlock-item ${lv >= u.level ? 'unlocked' : ''}"><span class="unlock-lv">Lv.${u.level}</span><span class="unlock-desc">${u.desc}</span></div>`).join('');
-  const cookCnt = Number(player.cookCount) || 0;
   return `<div class="skill-card">
     <div class="skill-card-name">庖丁（Lv.${lv}）</div>
     <div class="skill-card-row">升级经验：<b>${Math.round(skill.exp || 0)} / ${Math.round(need)}</b></div>
     <div class="skill-exp"><div class="skill-exp-fill" style="width:${Math.min(100, (skill.exp || 0) / need * 100)}%"></div></div>
     <div class="skill-train-meta">每级提升：刀法 +1，烹饪品质提升　每2级悟性 +1</div>
-    <div class="skill-card-row">当前固定加成：<b>+${getPaodingFixedBonus()}</b>　倍率加成：<b>×${getPaodingQualityMultiplier().toFixed(2)}</b></div>
     <div class="skill-card-row">经验倍率：<b>×${getPaodingExpMultiplier().toFixed(2)}</b></div>
     <div class="skill-card-row">当前双倍产出概率：<b>${formatPercent(getPaodingDoubleChance())}</b></div>
-    <div class="skill-card-row">烹饪次数：<b>${cookCnt} / 100</b>${cookCnt >= 100 ? '（已领悟庖丁刀法）' : '（满 100 领悟庖丁刀法）'}</div>
+    <div class="skill-unlocks"><div class="unlock-title">突 破 节 点</div>${unlockHtml}</div>
+  </div>`;
+}
+
+function buildFarmerTechniqueCard() {
+  if (typeof getFarmerTechnique !== 'function') return '';
+  const skill = getFarmerTechnique();
+  if (!skill) return '';
+  const lv = Math.max(0, Number(skill.level) || 0);
+  const need = getFarmerExpNeed(lv);
+  const unlocks = [
+    { level: 10,  desc: '基础收获时间 -30s，收获品质 +10%' },
+    { level: 25,  desc: '根骨 +10，收获品质 +20%' },
+    { level: 50,  desc: '基础收获时间 -90s，收获品质 +30%，每次收获有 [农夫等级-20]% 概率双倍产出' },
+    { level: 80,  desc: '根骨 +30，收获品质 +40%' },
+    { level: 100, desc: '根骨 +50，收获品质 +50%' },
+    { level: 125, desc: '获得特质【勤耕不辍】：见微知著获取速度提升 [10+农夫等级/5]%' }
+  ];
+  const unlockHtml = unlocks.map(u => `<div class="unlock-item ${lv >= u.level ? 'unlocked' : ''}"><span class="unlock-lv">Lv.${u.level}</span><span class="unlock-desc">${u.desc}</span></div>`).join('');
+  const durSec = getFarmerDurationMs(lv) / 1000;
+  const durLabel = typeof fmtDurationCN === 'function'
+    ? `${fmtDurationCN(Math.round(durSec))}（${durSec.toFixed(1).replace(/\.0$/, '')} 秒）`
+    : `${durSec.toFixed(1).replace(/\.0$/, '')} 秒`;
+  return `<div class="skill-card">
+    <div class="skill-card-name">农夫（Lv.${lv}）</div>
+    <div class="skill-card-row">升级经验：<b>${Math.round(skill.exp || 0)} / ${Math.round(need)}</b></div>
+    <div class="skill-exp"><div class="skill-exp-fill" style="width:${Math.min(100, (skill.exp || 0) / need * 100)}%"></div></div>
+    <div class="skill-train-meta">每级提升：收获品质提升，收获速度 +2%，收获时间减少　每2级根骨 +1</div>
+    <div class="skill-card-row">经验倍率：<b>×${getFarmerExpMultiplier().toFixed(2)}</b></div>
+    <div class="skill-card-row">当前收获品质：<b>${getFarmerQuality(lv)}%</b></div>
+    <div class="skill-card-row">当前双倍产出概率：<b>${formatPercent(getFarmerDoubleChance(lv))}</b></div>
+    <div class="skill-card-row">当前收获时间：<b>${durLabel}</b></div>
+    ${lv >= 125 ? `<div class="skill-card-row">【勤耕不辍】：见微知著获取速度 <b>+${fmtBondStat(getFarmerQinGengBonus(lv))}%</b></div>` : ''}
     <div class="skill-unlocks"><div class="unlock-title">突 破 节 点</div>${unlockHtml}</div>
   </div>`;
 }
@@ -379,6 +409,6 @@ function buildPaodingTechniqueCard() {
 function renderTechniques() {
   const el = $('technique-list');
   if (!el) return;
-  const html = buildFishingTechniqueCard() + buildPaodingTechniqueCard();
+  const html = buildFishingTechniqueCard() + buildPaodingTechniqueCard() + buildFarmerTechniqueCard();
   el.innerHTML = html || '<div class="tech-empty">尚未习得任何技艺</div>';
 }

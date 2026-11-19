@@ -175,7 +175,9 @@ function makeSparEnemy(npcId) {
     enemy.huomaiLayers = 1;
     enemy.huomaiInterval = 5000;
     enemy.huomaiNextAt = enemyNow + enemy.huomaiInterval;
-    enemy.huomaiRegenPerLayer = (Number(st.medicine) || 0) / 50;
+    enemy.huomaiRegenPerLayer = typeof getHuomaiRegenPerLayer === 'function'
+      ? getHuomaiRegenPerLayer(Number(st.levels && st.levels.huomai) || 0, st.medicine)
+      : (Number(st.medicine) || 0) / 50;
     enemy.huomaiSpeedPerLayer = 0;
   }
   if (def.wujiu) enemy.wujiuStacks = 0;

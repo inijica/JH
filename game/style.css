@@ -186,10 +186,10 @@ h1{font-size:calc(20px * var(--font-scale, 1.1));font-weight:600;letter-spacing:
   .battle-start-wrap .main-btn{min-width:0;width:100%}
 }
 
-.technique-columns{max-width:860px;margin:0 auto}
+.technique-columns{max-width:980px;margin:0 auto}
 .technique-columns .skill-col{flex:1 1 100%}
 #technique-list{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
-#technique-list .skill-card{flex:1 1 320px;min-width:0;max-width:100%;margin-bottom:0}
+#technique-list .skill-card{flex:1 1 280px;min-width:0;max-width:100%;margin-bottom:0}
 #technique-list .skill-card:only-child{flex:0 1 520px;margin:0 auto}
 .tech-empty{width:100%;text-align:center;padding:30px 0;color:#a5a294;font-size:calc(12px * var(--font-scale,1.1));letter-spacing:2px}
 
@@ -204,8 +204,11 @@ h1{font-size:calc(20px * var(--font-scale, 1.1));font-weight:600;letter-spacing:
 .cooking-col{flex:1;background:rgba(237,233,222,.55);border:1px solid #d5d0c2;border-radius:2px;padding:12px;min-width:0;position:relative;display:flex;flex-direction:column}
 .cooking-col-title{font-size:calc(12px * var(--font-scale,1.1));color:var(--jade-dark);letter-spacing:3px;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid #d9d4c7;text-align:center}
 .recipe-item{padding:10px;border:1px solid #d5d0c2;border-radius:2px;background:rgba(255,255,255,.6);margin-bottom:8px;cursor:pointer;transition:all .18s;font-size:calc(13px * var(--font-scale,1.1));color:var(--jade-dark)}
+.recipe-item:hover{border-color:var(--jade)}
 .recipe-item.active{border-color:var(--jade);background:rgba(76,101,88,.12);font-weight:600}
 .recipe-item-desc{font-size:calc(10px * var(--font-scale,1.1));color:#8b8979;line-height:1.5;margin-top:4px;font-weight:400}
+.ing-group-title{font-size:calc(10.5px * var(--font-scale,1.1));color:var(--gold);letter-spacing:3px;margin:8px 0 5px;padding-left:6px;border-left:2px solid var(--jade)}
+.ing-group-title:first-child{margin-top:0}
 .stove-card{text-align:center;padding:12px;background:rgba(166,138,82,.08);border:1px dashed rgba(166,138,82,.4);border-radius:2px;margin-bottom:12px}
 .stove-icon{font-size:calc(26px * var(--font-scale,1.1));margin-bottom:4px}
 .stove-name{font-size:calc(13px * var(--font-scale,1.1));color:var(--jade-dark);letter-spacing:2px}
@@ -232,6 +235,33 @@ h1{font-size:calc(20px * var(--font-scale, 1.1));font-weight:600;letter-spacing:
 .ing-empty{font-size:calc(11px * var(--font-scale,1.1));color:#a5a294;text-align:center;padding:20px 0;letter-spacing:1px}
 @media(max-width:700px){
   .cooking-grid{flex-direction:column}
+}
+
+/* ===== 农田界面 ===== */
+.farm-box{width:680px}
+.farm-body{padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.farm-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;background:rgba(237,233,222,.55);border:1px solid #d5d0c2;border-radius:2px}
+.farm-meta{font-size:calc(11.5px * var(--font-scale,1.1));color:#6e7268;line-height:1.6}
+.farm-fill-ctrl{display:flex;align-items:center;gap:8px}
+.farm-fill-ctrl select{padding:7px 10px;border:1px solid var(--line);background:#fbfaf6;color:var(--ink);font:inherit;font-size:calc(12.5px * var(--font-scale,1.1));border-radius:2px}
+.farm-fill-ctrl button{padding:7px 14px;border:1px solid var(--jade);background:var(--jade-dark);color:#f8f5eb;font:inherit;font-size:calc(12.5px * var(--font-scale,1.1));letter-spacing:2px;border-radius:2px;cursor:pointer;transition:filter .18s}
+.farm-fill-ctrl button:hover{filter:brightness(1.1)}
+.farm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.farm-cell{position:relative;min-height:112px;background:rgba(237,233,222,.65);border:1px solid #c9c4b5;border-radius:2px;padding:12px 10px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;text-align:center;cursor:pointer;transition:all .18s;box-shadow:inset 0 0 0 3px rgba(255,255,255,.35)}
+.farm-cell:hover{border-color:var(--jade);background:rgba(255,255,255,.82)}
+.farm-cell.growing{background:rgba(76,101,88,.09);border-color:rgba(76,101,88,.55)}
+.farm-cell-idx{position:absolute;left:7px;top:5px;font-size:calc(10px * var(--font-scale,1.1));color:#999688}
+.farm-cell-name{font-size:calc(14px * var(--font-scale,1.1));color:var(--jade-dark);font-weight:600;letter-spacing:2px;margin-top:8px}
+.farm-cell.empty .farm-cell-name{color:#8a897c;font-weight:400}
+.farm-cell-effect{font-size:calc(10.5px * var(--font-scale,1.1));color:var(--gold);margin-top:2px}
+.farm-cell-progress{width:100%;height:7px;background:#dedacd;border:1px solid rgba(0,0,0,.04);border-radius:1px;overflow:hidden;margin-top:8px}
+.farm-cell-progress-fill{height:100%;width:0;background:linear-gradient(90deg,#6c8c68,#a68a52);transition:width .25s linear}
+.farm-cell-time{font-size:calc(11px * var(--font-scale,1.1));color:#6e7268;margin-top:5px}
+.farm-picker-modal{z-index:170}
+#farmPickerModal,#farmConfirmModal{z-index:175}
+@media(max-width:560px){
+  .farm-grid{gap:7px}
+  .farm-cell{min-height:96px;padding:10px 6px}
 }
 
 .game-body{display:flex;gap:12px;align-items:flex-start;width:100%}

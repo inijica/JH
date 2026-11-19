@@ -5,9 +5,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>武侠放置</title>
-<meta name="description" content="水墨武侠放置游戏，含修炼、垂钓、烹饪、切磋、羁绊与入梦挑战。">
+<meta name="description" content="水墨武侠放置游戏，含修炼、垂钓、烹饪、农田、切磋、羁绊与入梦挑战。">
 <meta property="og:title" content="武侠放置">
-<meta property="og:description" content="水墨武侠放置游戏，含修炼、垂钓、烹饪、切磋、羁绊与入梦挑战。">
+<meta property="og:description" content="水墨武侠放置游戏，含修炼、垂钓、烹饪、农田、切磋、羁绊与入梦挑战。">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="style.css">
@@ -232,12 +232,16 @@
               <div class="place-card">
                 <div class="place-name">住 处</div>
                 <div class="place-desc">裴文秀寻得的一处清净小宅，青砖灰瓦掩在深巷尽头，院里栽着一株老槐树，院角还砌了一方小小的练功场。</div>
+                <div class="npc-row" id="capitalResidenceNpcs" style="display:none">
+                  <div class="npc-box npc-mystery" id="npcPeiWenxiuCapital" style="display:none">裴 文 秀</div>
+                </div>
                 <div class="training-actions">
                   <button type="button" id="trainCapitalInternalBtn">打坐入定</button>
                   <button type="button" id="trainStoneLockBtn">石锁锤炼</button>
                   <button type="button" id="trainWaterPlumBtn">水上梅桩</button>
                   <button type="button" id="trainSparPracticeBtn">招式对练</button>
-                  <button type="button" id="capitalCookBtn">烹 饪</button>
+                  <button type="button" id="capitalCookBtn">灶 台</button>
+                  <button type="button" id="farmOpenBtn" style="display:none">农 田</button>
                 </div>
               </div>
               <div class="place-card">
@@ -617,6 +621,47 @@
     </div>
   </div>
 
+  <div id="farmOverlay" class="cooking-overlay">
+    <div class="cooking-box farm-box">
+      <div class="cooking-head">
+        <span>住 处 · 后 院 农 田</span>
+        <button type="button" id="farmCloseBtn">关闭</button>
+      </div>
+      <div class="farm-body">
+        <div class="farm-toolbar">
+          <div class="farm-meta" id="farmMetaText">裴文秀会照料农田并自动收获与续种。</div>
+          <div class="farm-fill-ctrl">
+            <select id="farmFillSelect"></select>
+            <button type="button" id="farmFillAllBtn">一键种满</button>
+          </div>
+        </div>
+        <div id="farmGrid" class="farm-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="farmPickerModal" class="bag-modal">
+    <div class="bag-modal-box bond-modal-box">
+      <div class="bag-modal-title" id="farmPickerTitle">选 择 作 物</div>
+      <div class="bag-modal-desc" id="farmPickerDesc"></div>
+      <div id="farmPickerList" class="bond-modal-list"></div>
+      <div class="bag-modal-actions" style="margin-top:12px">
+        <button type="button" id="farmPickerCloseBtn">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="farmConfirmModal" class="bag-modal">
+    <div class="bag-modal-box">
+      <div class="bag-modal-title">更 改 种 植</div>
+      <div class="bag-modal-desc" id="farmConfirmDesc">确认更改正在种植的作物并重新计时吗？</div>
+      <div class="bag-modal-actions">
+        <button type="button" id="farmConfirmOkBtn">确认</button>
+        <button type="button" id="farmConfirmCancelBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
   <div id="strategyOverlay" class="strategy-overlay">
     <div class="strategy-box">
       <div class="strategy-head">
@@ -703,6 +748,7 @@
 <script src="bag.js"></script>
 <script src="fishing.js"></script>
 <script src="cooking.js"></script>
+<script src="farm.js"></script>
 <script src="training.js"></script>
 <script src="neili.js"></script>
 <script src="story.js"></script>

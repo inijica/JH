@@ -1,13 +1,21 @@
-/* 物品与鱼获数据（从 game.js 拆出，需在 game.js 之前加载） */
+/* 物品、鱼获与蔬果数据（从 game.js 拆出，需在 game.js 之前加载） */
 const FISH_EFFECTS = {
   jiyu:      { stat: 'root',         baseValue: 0.008, legacyPerWeight: 0.012, label: '根骨' },
   caoyu:     { stat: 'constitution', baseValue: 0.062, legacyPerWeight: 0.009, label: '体魄' },
   baitiao:   { stat: 'neiLi',        baseValue: 0.05,  legacyPerWeight: 0.24,  label: '内力' },
   chilinyu:  { stat: 'neiLi',        baseValue: 0.16,  legacyPerWeight: 0.35,  label: '内力' },
-  bailingyu: { stat: 'qinggongExp',  baseValue: 300,   label: '轻功经验' },
-  xishiban:  { stat: 'constitution', baseValue: 0.1,   label: '体魄' },
-  hongwei:   { stat: 'neiLi',        baseValue: 0.5,   label: '内力' },
-  qingyu:    { stat: 'root',         baseValue: 0.03,  label: '根骨' }
+  bailingyu: { stat: 'qinggongExp',  baseValue: 180,   label: '轻功经验' },
+  xishiban:  { stat: 'constitution', baseValue: 0.08,  label: '体魄' },
+  hongwei:   { stat: 'neiLi',        baseValue: 0.2,   label: '内力' },
+  qingyu:    { stat: 'root',         baseValue: 0.024, label: '根骨' }
+};
+
+const VEG_EFFECTS = {
+  fanqie:   { stat: 'constitution', baseValue: 0.5,  label: '体魄' },
+  baicai:   { stat: 'neiLi',        baseValue: 2,    label: '内力' },
+  shanyao:  { stat: 'root',         baseValue: 0.05, label: '根骨' },
+  luobo:    { stat: 'comp',         baseValue: 0.05, label: '悟性' },
+  huanggua: { stat: 'luck',         baseValue: 0.05, label: '定力' }
 };
 
 function getRawFishGain(fishId, data) {
@@ -23,6 +31,14 @@ function getRawFishGain(fishId, data) {
   return 0;
 }
 
+function getRawVegGain(vegId, data) {
+  const eff = VEG_EFFECTS[vegId];
+  if (!eff) return 0;
+  const d = data || {};
+  const q = (d.quality != null && Number.isFinite(Number(d.quality))) ? Number(d.quality) : 100;
+  return eff.baseValue * (Math.max(0, q) / 100);
+}
+
 function getCookedFishGain(data) {
   const d = data || {};
   const eff = FISH_EFFECTS[d.fishId];
@@ -35,6 +51,28 @@ function getCookedFishGain(data) {
     return (Number(d.weight) || 0) * eff.legacyPerWeight * mult;
   }
   return eff.baseValue * mult;
+}
+
+function getStewedDishGains(data) {
+  const d = data || {};
+  const mult = Number(d.effectMult) || 1;
+  const fishEff = FISH_EFFECTS[d.fishId];
+  const vegEff = VEG_EFFECTS[d.vegId];
+  const merged = {};
+  const add = (eff, val) => {
+    if (!eff || !(val > 0)) return;
+    if (!merged[eff.stat]) merged[eff.stat] = { stat: eff.stat, label: eff.label, gain: 0 };
+    merged[eff.stat].gain += val;
+  };
+  if (fishEff) {
+    const rawFish = getRawFishGain(d.fishId, { weight: d.weight, quality: d.fishQuality });
+    add(fishEff, rawFish * mult);
+  }
+  if (vegEff) {
+    const rawVeg = getRawVegGain(d.vegId, { quality: d.vegQuality });
+    add(vegEff, rawVeg * mult);
+  }
+  return Object.values(merged);
 }
 
 function findTargetQinggongSkill() {
@@ -61,6 +99,15 @@ function grantFishEffect(fishId, gain, sourceLabel) {
     showToast(`吃下${sourceLabel}，${sk.name}经验 +${Math.round(gain)}`);
     return true;
   }
+  player[eff.stat] = (Number(player[eff.stat]) || 0) + gain;
+  const decimals = eff.stat === 'neiLi' ? 3 : 4;
+  showToast(`吃下${sourceLabel}，${eff.label} +${gain.toFixed(decimals)}`);
+  return true;
+}
+
+function grantVegEffect(vegId, gain, sourceLabel) {
+  const eff = VEG_EFFECTS[vegId];
+  if (!eff || !(gain > 0)) return false;
   player[eff.stat] = (Number(player[eff.stat]) || 0) + gain;
   const decimals = eff.stat === 'neiLi' ? 3 : 4;
   showToast(`吃下${sourceLabel}，${eff.label} +${gain.toFixed(decimals)}`);
@@ -156,6 +203,61 @@ const ITEM_DEFS = {
       return grantFishEffect('qingyu', gain, d.weight != null ? `青鱼（${Number(d.weight).toFixed(2)}s）` : '青鱼');
     }
   },
+  fanqie: {
+    name: '番茄',
+    type: '蔬菜',
+    desc: '红润饱满的番茄，酸甜多汁，生食即可滋补体魄。',
+    usable: true,
+    use: (item) => {
+      const d = item.data || {};
+      const gain = getRawVegGain('fanqie', d);
+      return grantVegEffect('fanqie', gain, '番茄');
+    }
+  },
+  baicai: {
+    name: '白菜',
+    type: '蔬菜',
+    desc: '叶片翠绿紧实的鲜白菜，清润甘甜，有助积蓄内力。',
+    usable: true,
+    use: (item) => {
+      const d = item.data || {};
+      const gain = getRawVegGain('baicai', d);
+      return grantVegEffect('baicai', gain, '白菜');
+    }
+  },
+  shanyao: {
+    name: '山药',
+    type: '蔬菜',
+    desc: '肉质绵密的山药，温补脾肾，能缓缓强健根骨。',
+    usable: true,
+    use: (item) => {
+      const d = item.data || {};
+      const gain = getRawVegGain('shanyao', d);
+      return grantVegEffect('shanyao', gain, '山药');
+    }
+  },
+  luobo: {
+    name: '萝卜',
+    type: '蔬菜',
+    desc: '脆生生的大萝卜，清气通窍，食之令人神思清明、略增悟性。',
+    usable: true,
+    use: (item) => {
+      const d = item.data || {};
+      const gain = getRawVegGain('luobo', d);
+      return grantVegEffect('luobo', gain, '萝卜');
+    }
+  },
+  huanggua: {
+    name: '黄瓜',
+    type: '蔬菜',
+    desc: '顶花带刺的嫩黄瓜，清凉爽口，有助凝神静气、稳固定力。',
+    usable: true,
+    use: (item) => {
+      const d = item.data || {};
+      const gain = getRawVegGain('huanggua', d);
+      return grantVegEffect('huanggua', gain, '黄瓜');
+    }
+  },
   wuxueXinde: {
     name: '武学心得',
     type: '心法',
@@ -225,6 +327,43 @@ const ITEM_DEFS = {
       const gain = getCookedFishGain(d);
       return grantFishEffect(d.fishId, gain, d.name || '烤鱼');
     }
+  },
+  shucaiDunyu: {
+    name: '蔬菜炖鱼',
+    type: '菜',
+    desc: '将时蔬与鲜鱼一同慢炖而成的佳肴。',
+    usable: true,
+    use: (item) => {
+      const d = item.data || {};
+      const gains = getStewedDishGains(d);
+      if (!gains.length) return false;
+      const needsQinggong = gains.some(g => g.stat === 'qinggongExp');
+      let qgSkill = null;
+      if (needsQinggong) {
+        qgSkill = findTargetQinggongSkill();
+        if (!qgSkill && gains.length === 1) {
+          showToast('尚未习得轻功，无法吸收菜肴中的灵气');
+          return false;
+        }
+      }
+      const parts = [];
+      for (const g of gains) {
+        if (g.stat === 'qinggongExp') {
+          if (qgSkill) {
+            addSkillExp(qgSkill, g.gain);
+            if (typeof renderSkills === 'function') renderSkills();
+            parts.push(`${qgSkill.name}经验 +${Math.round(g.gain)}`);
+          }
+        } else {
+          player[g.stat] = (Number(player[g.stat]) || 0) + g.gain;
+          const decimals = g.stat === 'neiLi' ? 3 : 4;
+          parts.push(`${g.label} +${g.gain.toFixed(decimals)}`);
+        }
+      }
+      if (!parts.length) return false;
+      showToast(`吃下${d.name || '蔬菜炖鱼'}，${parts.join('、')}`);
+      return true;
+    }
   }
 };
 
@@ -244,6 +383,15 @@ const COOK_RECIPES = {
     id: 'kaoyu',
     name: '烤鱼',
     desc: '将鱼处理干净后架于火上慢烤。',
+    reqDesc: '需求：鱼类 ×1',
+    stoveBonus: 5,
+    duration: 3000
+  },
+  shucaiDunyu: {
+    id: 'shucaiDunyu',
+    name: '蔬菜炖鱼',
+    desc: '鲜鱼与时蔬同锅细煨，二者滋味相融。额外获得 75% 庖丁经验。',
+    reqDesc: '需求：鱼类 ×1，蔬菜 ×1',
     stoveBonus: 5,
     duration: 3000
   }

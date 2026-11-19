@@ -179,18 +179,21 @@ function resumeOfflineFishing() {
   if (typeof startFishing === 'function') startFishing(getGameClockMs());
 }
 
-/* 离开时正在烤鱼：保留已入炉的食材并恢复烹饪进度（不结算离线收获） */
+/* 离开时正在烹饪：保留已入炉的食材并恢复烹饪进度（不结算离线收获） */
 function resumeOfflineCooking(cookingInfo) {
   if (!cookingInfo || !Array.isArray(cookingInfo.pending) || !cookingInfo.pending.length) return;
   if (typeof storyFlags !== 'undefined' && storyFlags.leftVillage && !storyFlags.arrivedCapital) return;
   if (typeof cookingState === 'undefined' || typeof COOK_RECIPES === 'undefined') return;
   const items = cookingInfo.pending
     .map(it => ({
+      recipe: (it && it.recipe === 'shucaiDunyu') || cookingInfo.recipe === 'shucaiDunyu' ? 'shucaiDunyu' : '',
       fishId: it && it.fishId,
       weight: Number(it && it.weight) || 0,
-      fishQuality: it && it.fishQuality != null && Number.isFinite(Number(it.fishQuality)) ? Number(it.fishQuality) : null
+      fishQuality: it && it.fishQuality != null && Number.isFinite(Number(it.fishQuality)) ? Number(it.fishQuality) : null,
+      vegId: it && it.vegId && typeof ITEM_DEFS !== 'undefined' && ITEM_DEFS[it.vegId] ? it.vegId : '',
+      vegQuality: it && it.vegQuality != null && Number.isFinite(Number(it.vegQuality)) ? Number(it.vegQuality) : 100
     }))
-    .filter(it => typeof ITEM_DEFS !== 'undefined' && ITEM_DEFS[it.fishId]);
+    .filter(it => typeof ITEM_DEFS !== 'undefined' && ITEM_DEFS[it.fishId] && (it.recipe !== 'shucaiDunyu' || ITEM_DEFS[it.vegId]));
   if (!items.length) return;
   cookingState.recipe = COOK_RECIPES[cookingInfo.recipe] ? cookingInfo.recipe : 'kaoyu';
   cookingState.pending = items;

@@ -42,9 +42,9 @@ const HUOMAI_RATE_BASE = 0.01;
 const HUOMAI_RATE_PER_LEVEL = 0.005;
 const HUOMAI_UNLOCKS = [
   { level: 5,   desc: '战斗开始及每 5 秒获得一层【活脉】，每层提供医术/50 的每秒生命恢复' },
-  { level: 20,  desc: '【活脉】的叠加速度提升到 3 秒一层' },
+  { level: 20,  desc: '【活脉】的叠加速度提升到 3 秒一层，【活脉】效果增强至每层提供医术/30 的每秒生命恢复' },
   { level: 50,  desc: '每层【活脉】额外提升医术/100000 的行动速度' },
-  { level: 100, desc: '【活脉】的叠加速度提升到 2 秒一层' }
+  { level: 100, desc: '【活脉】的叠加速度提升到 2 秒一层，【活脉】效果增强至每层提供医术/10 的每秒生命恢复' }
 ];
 
 function getHuomaiSkill() {
@@ -77,8 +77,10 @@ function getHuomaiLayerInterval(level = getHuomaiLevel()) {
   if (level >= 20) return 3;
   return 5;
 }
-function getHuomaiRegenPerLayer(medicine) {
+function getHuomaiRegenPerLayer(level = getHuomaiLevel(), medicine) {
   const m = medicine == null ? getTotalMedicine() : Number(medicine) || 0;
+  if (level >= 100) return m / 10;
+  if (level >= 20) return m / 30;
   return m / 50;
 }
 function getHuomaiSpeedPerLayer(level = getHuomaiLevel(), medicine) {

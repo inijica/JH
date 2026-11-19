@@ -7,7 +7,7 @@ const SKILL_REQUIREMENTS = {
   qiangshen: { '体魄': 8, '根骨': 6 },
   tanafa: { '内力': 15, '体魄': 4 },
   qingyuan: { '悟性': 8, '内力': 50 },
-  huomai: { '内力': 100, '医术': 20 }
+  huomai: { '内力': 100, '医术': 25 }
 };
 const SKILL_TYPES = ['招式','轻功','外功','内功'];
 
@@ -41,13 +41,14 @@ function getSkillDifficulty(skill) {
   return getOriginalDifficulty(skill);
 }
 
-/* 每秒基础见微知著获取量：按当前钻研武功的原始难度打折 */
+/* 每秒基础见微知著获取量：按当前钻研武功的原始难度打折，农夫 Lv.125【勤耕不辍】额外加速 */
 function getJwzzGainPerSec(skill) {
   const comp = Number(player.comp) || 0;
   const nei = Number(player.neiLi) || 0;
   const martial = getBaseMartialSum();
   const base = 0.01 + (comp / 2000) * (1 + (nei + martial) / 1000000);
-  return base / (getOriginalDifficulty(skill) * 2.5);
+  const farmerMult = typeof getFarmerQinGengMultiplier === 'function' ? getFarmerQinGengMultiplier() : 1;
+  return (base / (getOriginalDifficulty(skill) * 2.5)) * farmerMult;
 }
 
 /* 在线钻研 tick：同一时间只钻研一门，与修炼/钓鱼/烹饪并行 */
@@ -196,6 +197,7 @@ function startTraining(activity) {
   } else {
     $('trainingStatus').textContent = `正在${TRAINING_ACTIVITY[activity].label}，修炼：${skill.name}`;
   }
+  if (typeof syncFishingConcurrentDuration === 'function') syncFishingConcurrentDuration();
   document.querySelectorAll('.training-actions button').forEach(b=>b.classList.remove('active'));
   const btn = $(TRAINING_ACTIVITY[activity].btnId);
   if (player.trainingActivity && btn) btn.classList.add('active');
@@ -210,6 +212,7 @@ function stopTraining() {
   player.trainingInteractionEfficiency = 0;
   player.trainingLastTick = 0;
   lastTrainingClockMs = 0;
+  if (typeof syncFishingConcurrentDuration === 'function') syncFishingConcurrentDuration();
   document.querySelectorAll('.training-actions button').forEach(b => b.classList.remove('active'));
   updateTrainingUI();
 }

@@ -1,6 +1,10 @@
 /* 背包系统（从 game.js 拆出，需在 game.js 之前加载） */
 function getItemStackKey(slot) {
   if (!slot) return '';
+  if (typeof VEG_EFFECTS !== 'undefined' && VEG_EFFECTS[slot.id]) {
+    const q = slot.data && slot.data.quality != null ? Number(slot.data.quality) : 100;
+    return `${slot.id}|q:${q}`;
+  }
   return slot.id + '|' + getItemDisplayName(slot);
 }
 
@@ -8,7 +12,7 @@ function findItemInsertIndex(id, data) {
   const inv = player.inventory;
   const def = ITEM_DEFS[id];
   if (!def) return inv.length;
-  const name = (id === 'kaoyu' && data && data.name) ? data.name : def.name;
+  const name = ((id === 'kaoyu' || id === 'shucaiDunyu') && data && data.name) ? data.name : def.name;
   for (let i = inv.length - 1; i >= 0; i--) {
     const s = inv[i];
     if (!s) continue;
@@ -32,6 +36,21 @@ function addItem(id, qty = 1, data = null) {
   if (!ITEM_DEFS[id] || !(qty > 0)) return;
   if (!Array.isArray(player.inventory)) player.inventory = [];
   if (data) {
+    /* 蔬果不计算重量，相同品质可以叠加 */
+    if (typeof VEG_EFFECTS !== 'undefined' && VEG_EFFECTS[id] && data.quality != null) {
+      const targetQ = Number(data.quality);
+      const slot = player.inventory.find(x =>
+        x && x.id === id && x.data && Number(x.data.quality) === targetQ
+      );
+      if (slot) {
+        slot.qty += qty;
+        scheduleBagRender();
+        return;
+      }
+      player.inventory.splice(findItemInsertIndex(id, data), 0, { id, qty, data: { quality: targetQ } });
+      scheduleBagRender();
+      return;
+    }
     player.inventory.splice(findItemInsertIndex(id, data), 0, { id, qty, data });
     scheduleBagRender();
     return;
@@ -56,7 +75,7 @@ function removeItemAt(idx, qty = 1) {
 
 function getItemDisplayName(slot) {
   const def = ITEM_DEFS[slot.id];
-  if (slot.id === 'kaoyu' && slot.data && slot.data.name) return slot.data.name;
+  if ((slot.id === 'kaoyu' || slot.id === 'shucaiDunyu') && slot.data && slot.data.name) return slot.data.name;
   return def ? def.name : '?';
 }
 
@@ -74,6 +93,16 @@ function getBagItemDesc(slot) {
     const valStr = eff && eff.stat === 'qinggongExp' ? Math.round(gain).toString() : gain.toFixed(4);
     return `以${fishDef ? fishDef.name : '鱼'}烤制而成。食用后${eff ? eff.label : '属性'} +${valStr}`;
   }
+  if (slot.id === 'shucaiDunyu' && slot.data) {
+    const fishDef = ITEM_DEFS[slot.data.fishId];
+    const vegDef = ITEM_DEFS[slot.data.vegId];
+    const gains = typeof getStewedDishGains === 'function' ? getStewedDishGains(slot.data) : [];
+    const gainText = gains.map(g => {
+      const valStr = g.stat === 'qinggongExp' ? Math.round(g.gain).toString() : g.gain.toFixed(4);
+      return `${g.label} +${valStr}`;
+    }).join('、');
+    return `以${vegDef ? vegDef.name : '蔬菜'}与${fishDef ? fishDef.name : '鱼'}同炖而成。${gainText ? `食用后${gainText}` : ''}`;
+  }
   if (FISH_EFFECTS[slot.id] && slot.data && (slot.data.quality != null || slot.data.weight != null)) {
     const eff = FISH_EFFECTS[slot.id];
     const gain = typeof getRawFishGain === 'function'
@@ -81,6 +110,13 @@ function getBagItemDesc(slot) {
       : (Number(slot.data.weight) || 0) * (eff.legacyPerWeight || 0);
     const valStr = eff.stat === 'qinggongExp' ? Math.round(gain).toString() : gain.toFixed(4);
     return `${def.desc || ''} 食用后${eff.label} +${valStr}`;
+  }
+  if (typeof VEG_EFFECTS !== 'undefined' && VEG_EFFECTS[slot.id]) {
+    const eff = VEG_EFFECTS[slot.id];
+    const gain = typeof getRawVegGain === 'function'
+      ? getRawVegGain(slot.id, slot.data)
+      : eff.baseValue;
+    return `${def.desc || ''} 食用后${eff.label} +${gain.toFixed(4)}`;
   }
   return def.desc || '';
 }
@@ -108,13 +144,13 @@ function renderBag() {
     const def = ITEM_DEFS[slot.id];
     if (!def) return '';
     let sub;
-    if (slot.id === 'kaoyu' && slot.data) {
+    if ((slot.id === 'kaoyu' || slot.id === 'shucaiDunyu') && slot.data) {
       sub = `品质 ${Math.round(slot.data.quality || 0)}`;
     } else if (slot.data && slot.data.weight != null) {
       sub = `${Number(slot.data.weight).toFixed(2)} s` +
         (slot.data.quality != null ? ` · 品质 ${Math.round(Number(slot.data.quality) || 0)}` : '');
     } else if (slot.data && slot.data.quality != null) {
-      sub = `品质 ${Math.round(Number(slot.data.quality) || 0)}`;
+      sub = `品质 ${fmtNum(Math.round((Number(slot.data.quality) || 0) * 100) / 100)}`;
     } else {
       sub = escapeHtml(def.type);
     }
@@ -146,12 +182,12 @@ function openBagItem(idx) {
 
   const displayName = getItemDisplayName(slot);
   let wTxt = '';
-  if (slot.id === 'kaoyu' && slot.data) {
+  if ((slot.id === 'kaoyu' || slot.id === 'shucaiDunyu') && slot.data) {
     wTxt = `　品质 ${Math.round(Number(slot.data.quality) || 0)}`;
   } else if (slot.data && (slot.data.weight != null || slot.data.quality != null)) {
     const parts = [];
     if (slot.data.weight != null) parts.push(`${Number(slot.data.weight).toFixed(2)} s`);
-    if (slot.data.quality != null) parts.push(`品质 ${Math.round(Number(slot.data.quality) || 0)}`);
+    if (slot.data.quality != null) parts.push(`品质 ${fmtNum(Math.round((Number(slot.data.quality) || 0) * 100) / 100)}`);
     wTxt = `　${parts.join(' · ')}`;
   }
   if (titleEl) titleEl.textContent = `${displayName}${wTxt}　×${slot.qty}`;
@@ -290,7 +326,7 @@ function useAllBagItems() {
 }
 
 function isFoodDef(def) {
-  return !!def && (def.type === '鱼' || def.type === '菜');
+  return !!def && (def.type === '鱼' || def.type === '菜' || def.type === '蔬菜');
 }
 
 function hasUsableFood() {

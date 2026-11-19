@@ -22,6 +22,7 @@ skills.js
 bag.js
 fishing.js
 cooking.js
+farm.js               ← 在 cooking.js 后、training.js 与 game.js 前
 training.js
 neili.js
 story.js
@@ -48,6 +49,7 @@ game.js               ← 启动逻辑必须最后
 | bag.js | 背包、物品使用、排序、快照 | 背包 |
 | fishing.js | 钓鱼状态、抛竿、结算、鱼重 | 钓鱼 |
 | cooking.js | 烹饪状态、配方、品质、完成 | 烹饪 |
+| farm.js | 农田 3×3 状态、自动收获续种、技艺「农夫」 | 农田 / 农夫 |
 | training.js | 修炼要求、经验、tick、按钮 | 修炼 |
 | neili.js | 淬火、活脉、内力速率/显示 | 内力 |
 | story.js | `window.DIALOG_TREE` 对话数据 | 对白/选项 |
@@ -71,6 +73,7 @@ game.js               ← 启动逻辑必须最后
 | 技能卡文案 | skillcards.js |
 | 升级经验/修炼速度 | training.js |
 | 物品/鱼/烹饪配方 | items.js |
+| 农田/农夫 | farm.js |
 | 对白/选项 | story.js |
 | 对话流程/剧情触发 | game.js |
 | 战斗 UI | battle-render.js |
@@ -137,7 +140,7 @@ const ctx = vm.createContext({
 });
 ctx.window = ctx;          // 浏览器里 window === globalThis
 ctx.globalThis = ctx;
-const files = ['core.js','items.js','npcs.js','npclogic.js','skills.js','bag.js','fishing.js','cooking.js','training.js','neili.js','story.js','battle-render.js','battle-strategy.js','battle.js','battle-spar.js','battle-events.js','dream.js','offline.js','skillcards.js','game.js'];
+const files = ['core.js','items.js','npcs.js','npclogic.js','skills.js','bag.js','fishing.js','cooking.js','farm.js','training.js','neili.js','story.js','battle-render.js','battle-strategy.js','battle.js','battle-spar.js','battle-events.js','dream.js','offline.js','skillcards.js','game.js'];
 for (const f of files) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx, { filename: f });
 ```
 
