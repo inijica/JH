@@ -1,6 +1,8 @@
 /* 离线奖励时间系统（从 game.js 拆出，需在 game.js 之前加载） */
-/* 计算离线时间，将离线时间 / 2 后得出奖励时间；
+/* 计算离线时间，将离线时间 / 2 后得出奖励时间；单次离线最多计算 24 小时（即单次最多奖励 12 小时）；
    奖励时间内游戏运行速度翻倍（2×），奖励时间可跨次累加，取消原本的离线结算收益。 */
+const OFFLINE_MAX_CALC_MS = 24 * 60 * 60 * 1000;
+const OFFLINE_MAX_BONUS_MS = 12 * 60 * 60 * 1000;
 
 let pendingOffline = null; // { at, ms, fishing, cooking } 由 loadGame 记录，待结算奖励时间
 
@@ -221,11 +223,14 @@ function consumePendingOffline() {
   let bonusInfo = null;
   const offlineMs = Math.max(0, Number(p.ms) || 0);
   if (typeof player !== 'undefined' && player && player.surname && offlineGainsEnabled() && offlineMs > 0) {
-    const bonusGainMs = Math.floor(offlineMs / 2);
+    const calcOfflineMs = Math.min(offlineMs, OFFLINE_MAX_CALC_MS);
+    const bonusGainMs = Math.min(OFFLINE_MAX_BONUS_MS, Math.floor(calcOfflineMs / 2));
     if (bonusGainMs >= 1000) {
       player.offlineBonusMs = getOfflineBonusMs() + bonusGainMs;
       bonusInfo = {
         offlineMs,
+        calcOfflineMs,
+        capped: offlineMs > OFFLINE_MAX_CALC_MS,
         bonusGainMs,
         totalBonusMs: player.offlineBonusMs
       };
@@ -248,8 +253,9 @@ function showOfflineBonusNotice(info) {
   const offTxt = fmtDurationCN(Math.floor(info.offlineMs / 1000));
   const gainTxt = fmtDurationCN(Math.floor(info.bonusGainMs / 1000));
   const totalTxt = fmtDurationCN(Math.floor(info.totalBonusMs / 1000));
+  const capNote = info.capped ? '（单次最多计算 24 小时离线，奖励上限 12 小时）' : '';
   if (typeof addIntel === 'function') {
-    addIntel(`离线 ${offTxt}，获得 ${gainTxt} 奖励时间（累计 ${totalTxt}，游戏运行速度 ×2）。`, 'gold');
+    addIntel(`离线 ${offTxt}，获得 ${gainTxt} 奖励时间${capNote}（累计 ${totalTxt}，游戏运行速度 ×2）。`, 'gold');
   }
   if (typeof showToast === 'function') {
     showToast(`离线 ${offTxt}，奖励时间 +${gainTxt}（2 倍速）`, 3200);

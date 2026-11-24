@@ -49,7 +49,7 @@ const WANGBA_UNLOCKS = [
   { level: 5,   desc: '伤害倍率提升至 0.1 倍，额外提升 1 根骨' },
   { level: 10,  desc: '伤害倍率提升至 0.135 倍，额外提升 10 体魄' },
   { level: 20,  desc: '伤害次数提升至 5 次，额外提升 30 体魄、3 根骨' },
-  { level: 50,  desc: '伤害次数提升至 7，倍率提升至 0.18 倍，额外提升 200 体魄、15 根骨' },
+  { level: 50,  desc: '伤害次数提升至 7，倍率提升至 0.18 倍，额外提升 150 体魄、15 根骨' },
   { level: 100, desc: '拳法+1000，体魄+1500；【撼山势】提供的增伤翻倍；战斗开始自动叠加 20 层【撼山势】，且每秒自动叠加 1 层（（仅装备时生效））' }
 ];
 
@@ -73,7 +73,7 @@ function getWangbaConBonus(level) {
   let bonus = 0;
   if (level >= 10) bonus += 10;
   if (level >= 20) bonus += 30;
-  if (level >= 50) bonus += 200;
+  if (level >= 50) bonus += 150;
   if (level >= 100) bonus += 1500;
   return bonus;
 }
@@ -108,7 +108,7 @@ const JIUSI_UNLOCKS = [
   { level: 5,   desc: '悟性+1，剑法+10' },
   { level: 10,  desc: '剑法+20，内力+5，伤害倍率提升至 0.07 倍' },
   { level: 20,  desc: '悟性+2，神宁气静+3，伤害倍率提升至 0.1 倍；【思退】满九层时，闪避后用九思剑法反击' },
-  { level: 50,  desc: '悟性+5，剑法+50，内力+100，伤害倍率提升至 0.13 倍，伤害次数提升至 6 次' },
+  { level: 50,  desc: '悟性+5，剑法+50，内力+200，伤害倍率提升至 0.13 倍，伤害次数提升至 6 次' },
   { level: 100, desc: '悟性+20，神宁气静+10，剑法+1000，内力+2500；进入战斗时立刻使用七次九思剑法（仅装备时生效）' }
 ];
 
@@ -150,7 +150,7 @@ function getJiusiCompBonus(level = getJiusiLevel()) {
 function getJiusiNeiLiBonus(level = getJiusiLevel()) {
   let bonus = 0;
   if (level >= 10) bonus += 5;
-  if (level >= 50) bonus += 100;
+  if (level >= 50) bonus += 200;
   if (level >= 100) bonus += 2500;
   return bonus;
 }
@@ -335,7 +335,7 @@ const FEISHIPO_UNLOCKS = [
   { level: 5,   desc: '伤害倍率提升至 0.06 倍' },
   { level: 10,  desc: '伤害倍率提升至 0.08 倍，伤害次数提升至 7 次，额外提升 5 体魄' },
   { level: 20,  desc: '伤害倍率提升至 0.1 倍，额外提升 30 暗器、5 虚实莫测' },
-  { level: 50,  desc: '伤害次数提升至 12 次，伤害倍率提升至 0.13 倍，额外提升 50 体魄、5 根骨；【打穴】消退速度降低 20%' },
+  { level: 50,  desc: '伤害次数提升至 12 次，伤害倍率提升至 0.13 倍，额外提升 100 体魄、10 根骨、5 虚实莫测；【打穴】消退速度降低 20%' },
   { level: 100, desc: '暗器+1500，虚实莫测+15；【打穴】消退速度降低提升至 70%' }
 ];
 
@@ -367,18 +367,19 @@ function getFeishipoConBonus(level = getFeishipoLevel()) {
   if (level <= 0) return 0;
   let bonus = 0;
   if (level >= 10) bonus += 5;
-  if (level >= 50) bonus += 50;
+  if (level >= 50) bonus += 100;
   return bonus;
 }
 
 /* 飞石破·根骨节点：固定值，不再乘见微知著倍率 */
 function getFeishipoRootBonus(level = getFeishipoLevel()) {
-  return level >= 50 ? 5 : 0;
+  return level >= 50 ? 10 : 0;
 }
 
 function getFeishipoXushiBonus(level = getFeishipoLevel()) {
   let bonus = 0;
   if (level >= 20) bonus += 5;
+  if (level >= 50) bonus += 5;
   if (level >= 100) bonus += 15;
   return bonus;
 }
@@ -439,7 +440,7 @@ const QIANGSHEN_UNLOCKS = [
   { level: 5,   desc: '额外提升 1 根骨' },
   { level: 10,  desc: '额外提升 10 体魄，每秒气血恢复 +10' },
   { level: 30,  desc: '额外提升 100 体魄，每秒气血恢复 +50' },
-  { level: 50,  desc: '额外提升 150 减伤，从五十重开始每重额外提升 2 体魄' },
+  { level: 50,  desc: '额外提升 350 减伤，从五十重开始每重额外提升 2 体魄' },
   { level: 100, desc: '体魄提升 20%（独立乘区）' }
 ];
 
@@ -481,7 +482,7 @@ function getHpRegen() {
 }
 
 function getExtraDR() {
-  return (getQiangshenLevel() >= 50 ? 150 : 0) + (Number(player.bonusDR) || 0);
+  return (getQiangshenLevel() >= 50 ? 350 : 0) + (Number(player.bonusDR) || 0);
 }
 
 function getMaxHp() { return Math.floor(80 + getTotalCon() * 20); }

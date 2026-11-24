@@ -80,6 +80,8 @@ const player = {
   bondXiaPuying: 50,
   bondPeiWenxiu: 0,
   bondDaoMiaomiao: 0,
+  bondGuXianchan: 0,
+  bondLongZhen: 0,
   companionId: 'xiaPuying',
   bond: { neiLi: 0, levels: { qingyuan: 12, feishipo: 9, tanafa: 9 }, lastCultAt: 0 },
   skills: [],
@@ -391,7 +393,10 @@ function updateMapView() {
 
 /* 京城住处与西巷、天街 */
 function updateCapitalNpcs() {
-  const showPei = !!storyFlags.arrivedCapital && !storyFlags.capitalPeiTalkDone;
+  const showPeiFirst = !!storyFlags.arrivedCapital && !storyFlags.capitalPeiTalkDone;
+  const showPeiReturn = !!storyFlags.arrivedCapital && !!storyFlags.capitalPeiTalkDone &&
+    !!storyFlags.tianjieStumbleDone && !!storyFlags.tianjieFengnianlouDone && !storyFlags.capitalPeiReturnDone;
+  const showPei = showPeiFirst || showPeiReturn;
   const npc = $('npcPeiWenxiuCapital');
   if (npc) npc.style.display = showPei ? '' : 'none';
   const row = $('capitalResidenceNpcs');
@@ -411,6 +416,11 @@ function updateCapitalNpcs() {
   if (shishuEl) shishuEl.style.display = (showDistricts && storyFlags.qingchengDiziDefeated && !storyFlags.qingchengShishuDefeated) ? '' : 'none';
   const laoShishuEl = $('npcLaoShishu');
   if (laoShishuEl) laoShishuEl.style.display = (showDistricts && storyFlags.qingchengShishuDefeated) ? '' : 'none';
+
+  const stumbleEl = $('npcTianjieStumble');
+  if (stumbleEl) stumbleEl.style.display = (showDistricts && !storyFlags.tianjieStumbleDone) ? '' : 'none';
+  const fnlEl = $('npcTianjieFengnianlou');
+  if (fnlEl) fnlEl.style.display = (showDistricts && !storyFlags.tianjieFengnianlouDone) ? '' : 'none';
 }
 
 function renderMainTab() {
@@ -494,6 +504,10 @@ const storyFlags = {
   daoMiaomiaoDefeated: false,
   yuxuObtained: false,
   yuxuFirstGranted: false,
+  tianjieStumbleDone: false,
+  tianjieFengnianlouDone: false,
+  airCujuSwitch: false,
+  capitalPeiReturnDone: false,
   farewellTiezhu: false,
   farewellShip: false,
   farewellDaifu: false,
@@ -605,6 +619,7 @@ function showDialogNode(id) {
   if (!node) return;
 
   currentDialogNode = id;
+  if (typeof node.onEnter === 'function') node.onEnter();
   if (node.setFlag) {
     storyFlags[node.setFlag] = true;
     updateLiQianyuanNpc();
@@ -914,8 +929,9 @@ $('dialogOptions').addEventListener('click', (e) => {
   if (opt.action === 'daoMiaomiaoBattle') { startWestAlleyStoryBattle('daoMiaomiao'); return; }
   if (opt.action === 'teachMedicine') { startMedicineLesson(); return; }
   if (opt.action === 'teachMartial') { startLiQianyuanLesson(); return; }
-  if (opt.action === 'leave' || !opt.next) { showDialogNode('end'); return; }
-  showDialogNode(opt.next);
+  const nextTarget = typeof opt.next === 'function' ? opt.next() : opt.next;
+  if (opt.action === 'leave' || !nextTarget) { showDialogNode('end'); return; }
+  showDialogNode(nextTarget);
 });
 
 $('dialogView').addEventListener('click', (e) => {
@@ -1112,8 +1128,30 @@ if (npcPeiWenxiuHomeEl) {
 const npcPeiWenxiuCapitalEl = $('npcPeiWenxiuCapital');
 if (npcPeiWenxiuCapitalEl) {
   npcPeiWenxiuCapitalEl.addEventListener('click', () => {
-    if (!storyFlags.arrivedCapital || storyFlags.capitalPeiTalkDone) return;
-    showDialogNode('capitalPeiTalk');
+    if (!storyFlags.arrivedCapital) return;
+    if (!storyFlags.capitalPeiTalkDone) {
+      showDialogNode('capitalPeiTalk');
+      return;
+    }
+    if (storyFlags.tianjieStumbleDone && storyFlags.tianjieFengnianlouDone && !storyFlags.capitalPeiReturnDone) {
+      showDialogNode('capitalPeiReturn');
+    }
+  });
+}
+
+const npcTianjieStumbleEl = $('npcTianjieStumble');
+if (npcTianjieStumbleEl) {
+  npcTianjieStumbleEl.addEventListener('click', () => {
+    if (!storyFlags.arrivedCapital || !storyFlags.capitalPeiTalkDone || storyFlags.tianjieStumbleDone) return;
+    showDialogNode('tianjieStumble');
+  });
+}
+
+const npcTianjieFengnianlouEl = $('npcTianjieFengnianlou');
+if (npcTianjieFengnianlouEl) {
+  npcTianjieFengnianlouEl.addEventListener('click', () => {
+    if (!storyFlags.arrivedCapital || !storyFlags.capitalPeiTalkDone || storyFlags.tianjieFengnianlouDone) return;
+    showDialogNode('tianjieFengnianlou');
   });
 }
 
@@ -3212,6 +3250,8 @@ function loadGame() {
     if (!Number.isFinite(Number(player.bondXiaPuying)) || Number(player.bondXiaPuying) <= 0) player.bondXiaPuying = 50;
     if (!Number.isFinite(Number(player.bondPeiWenxiu)) || Number(player.bondPeiWenxiu) < 0) player.bondPeiWenxiu = 0;
     if (!Number.isFinite(Number(player.bondDaoMiaomiao)) || Number(player.bondDaoMiaomiao) < 0) player.bondDaoMiaomiao = 0;
+    if (!Number.isFinite(Number(player.bondGuXianchan)) || Number(player.bondGuXianchan) < 0) player.bondGuXianchan = 0;
+    if (!Number.isFinite(Number(player.bondLongZhen)) || Number(player.bondLongZhen) < 0) player.bondLongZhen = 0;
     if (typeof player.companionId !== 'string' || !player.companionId) player.companionId = BOND_SPAR_ID;
     if (typeof player.hidden !== 'number' || !Number.isFinite(player.hidden)) player.hidden = 0;
     if (typeof player.changbing !== 'number' || !Number.isFinite(player.changbing)) player.changbing = 0;
@@ -3431,6 +3471,10 @@ function resetGame() {
     storyFlags.daoMiaomiaoDefeated = false;
     storyFlags.yuxuObtained = false;
     storyFlags.yuxuFirstGranted = false;
+    storyFlags.tianjieStumbleDone = false;
+    storyFlags.tianjieFengnianlouDone = false;
+    storyFlags.airCujuSwitch = false;
+    storyFlags.capitalPeiReturnDone = false;
     storyFlags.farewellTiezhu = false;
     storyFlags.farewellShip = false;
     storyFlags.farewellDaifu = false;
@@ -3446,6 +3490,8 @@ function resetGame() {
     player.bondXiaPuying = 50;
     player.bondPeiWenxiu = 0;
     player.bondDaoMiaomiao = 0;
+    player.bondGuXianchan = 0;
+    player.bondLongZhen = 0;
     player.companionId = BOND_SPAR_ID;
     player.fist = 0;
     player.blade = 0;
@@ -3984,6 +4030,10 @@ $('startBtn').addEventListener('click', () => {
   storyFlags.daoMiaomiaoDefeated = false;
   storyFlags.yuxuObtained = false;
   storyFlags.yuxuFirstGranted = false;
+  storyFlags.tianjieStumbleDone = false;
+  storyFlags.tianjieFengnianlouDone = false;
+  storyFlags.airCujuSwitch = false;
+  storyFlags.capitalPeiReturnDone = false;
   storyFlags.farewellTiezhu = false;
   storyFlags.farewellShip = false;
   storyFlags.farewellDaifu = false;
@@ -4039,6 +4089,8 @@ $('startBtn').addEventListener('click', () => {
   player.bondXiaPuying = 50;
   player.bondPeiWenxiu = 0;
   player.bondDaoMiaomiao = 0;
+  player.bondGuXianchan = 0;
+  player.bondLongZhen = 0;
   player.companionId = BOND_SPAR_ID;
   player.bond = { neiLi: 0, levels: { qingyuan: 9, feishipo: 7, tanafa: 7 }, lastCultAt: Date.now(), lastGrowthAt: Date.now() };
   player.strategy = defaultStrategy();

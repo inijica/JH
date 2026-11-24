@@ -1165,5 +1165,276 @@ ${storyFlags.yuxuFirstGranted ? '他自袖中取出一册青玉装帧的道经�
     text: () => `道渺渺收手而立，温和笑道：
 “内力之道贵在积蓄，切莫操之过急。回去再多加参悟《玉虚功》，贫道随时在此候教。”`,
     options: []
+  },
+
+  /* ================= 京城天街 · 踉跄 ================= */
+  tianjieStumble: {
+    speaker: '旁 白',
+    onEnter: () => {
+      if (!storyFlags.tianjieStumbleDone) {
+        storyFlags.tianjieStumbleDone = true;
+        updateCapitalNpcs();
+        saveGame();
+      }
+    },
+    text: () => `你在天街上闲逛，好奇地左右张望，只觉眼前所见都稀奇得紧。
+——啪嗒
+“唉呀？！对不起！对不起！”
+一时不慎，却是不小心撞到了人。
+与你相撞之人光顾着点头道歉，却是看不清他的样貌。
+听声音，尚显几分稚嫩，似乎是与你年纪相仿的少女。
+“那个，虽然很对不起你.....但是我还有急事，就先走了！抱歉！”
+话音刚落，她匆匆忙忙地就绕开你跑走了。
+你若有所悟地摸了摸怀中，果然，钱袋没了。
+“........”
+花开两朵，各表一枝。
+“嘿嘿~那家伙虽然看起来呆头呆脑的，衣饰却是华贵得很，一看就是突然得到泼天富贵的傻蛋。”
+少女钻进阴暗的小巷里，迫不及待地打开你的钱袋查看。
+“.....诶？”
+下一瞬间，她的表情凝固了。
+她缓缓抽出手，只见原本白净的手掌之间，忽然变得鲜血横溢。
+“痛哇哇哇哇！！！！！！！”
+“为什么会有人在钱袋里做机关啊喂！不怕拿钱的时候手被捅穿吗喂？！小二哥看到了会吓死的啊！”
+她泪眼花花地拔出手掌间的铁刺，从腰间的布包中取出些许止血散撒上，再小心翼翼地包扎好。
+“而且，为什么只有一两张小银票啊，比我还穷诶！”
+少女气鼓鼓地摸向怀中。
+“诶.......”
+“骗人的吧.......”
+“真的假的........”
+摸了好半天，少女的脸色却是变得越来越差。
+“——我的钱袋呢！！！！”
+另一边，你捡起了掉落地上的绣花钱袋，翻开一看，却是有着好几张大额银票。
+这下赚了。
+至于那个被你的好妹妹以“万一被人偷走了怎么办”为由，胡乱装了好几个机关的钱袋..........
+——再也不要回来了。`,
+    options: []
+  },
+
+  /* ================= 京城天街 · 凤年楼 ================= */
+  tianjieFengnianlou: {
+    speaker: '旁 白',
+    text: () => `你路过天街最煊赫的酒楼——凤年楼，只见里面吵吵嚷嚷的，时不时传出几句骂声，似乎是起了什么纷争。`,
+    options: [
+      { label: '进去劝和', next: 'tianjieFengnianlouFall' },
+      { label: '莫管闲事', next: 'tianjieFengnianlouFall' },
+      { label: '进去把两边都骂一顿，然后逃跑', next: 'tianjieFengnianlouFall' }
+    ]
+  },
+  tianjieFengnianlouFall: {
+    speaker: '旁 白',
+    text: () => `你刚要有所动作，只听呲啦一声，高楼的窗台上忽然摔落下一道人影。
+“啊啊啊啊啊啊啊！！！！小心啊！！！！！！”`,
+    options: [
+      {
+        label: '接住',
+        next: () => (getTotalCon() * 2 + getTotalNeiLi() > 1500 ? 'tianjieFnlCatchOk' : 'tianjieFnlCatchFail')
+      },
+      {
+        label: '踹回去',
+        next: () => (getTotalCon() * 2 + getTotalNeiLi() > 2500 ? 'tianjieFnlKickOk' : 'tianjieFnlKickFail')
+      },
+      {
+        label: '避开',
+        next: () => (getEvasionRate() > 0.5 ? 'tianjieFnlDodgeOk' : 'tianjieFnlDodgeFail')
+      }
+    ]
+  },
+  tianjieFnlCatchOk: {
+    speaker: '旁 白',
+    onEnter: () => {
+      if (!storyFlags.tianjieFengnianlouDone) {
+        storyFlags.tianjieFengnianlouDone = true;
+        player.bondLongZhen = (Number(player.bondLongZhen) || 0) + 20;
+        updateCapitalNpcs();
+        saveGame();
+      }
+    },
+    text: () => `你连抬脚的功夫都懒得废，手一伸，轻而易举地接住了他。
+“.......”
+你与他大眼瞪小眼，几息功夫过去，他的脸上忽地泛起几分羞红。
+“咳咳！”
+他连忙从你怀中尴尬地脱离出来。
+你仔细一瞧，竟是个丰神俊朗的少年。
+身形谈不上高大魁梧，却透露着几分精悍之气，似有千钧之力、偏又隐而不发。`,
+    options: [],
+    nextOnClick: 'tianjieFnlEnd'
+  },
+  tianjieFnlCatchFail: {
+    speaker: '旁 白',
+    onEnter: () => {
+      if (!storyFlags.tianjieFengnianlouDone) {
+        storyFlags.tianjieFengnianlouDone = true;
+        updateCapitalNpcs();
+        saveGame();
+      }
+    },
+    text: () => `你想要接住他，但眼见他落得离你越来越近，心中却忽然涌起不妙的预感。
+凭你的气力，似乎接不住他。
+就在你以为这下完蛋了的时候，那人眼见自己就要砸到你身上，忽地深吸一口气，强行在半空中扭转身子，翻旋起来，以险之又险的距离与你擦身而过，摔倒在地上。
+“好险好险.....你没事吧？”
+坠落之人缓缓从地上爬起，心有余悸。
+他那一袭白衣之上全是泥尘，样子狼狈不堪。
+可若仔细一瞧，亦能辨出狼狈之下所掩藏着的，是个丰神俊朗的少年。
+身形谈不上高大魁梧，却透露着几分精悍之气，似有千钧之力、偏又隐而不发。`,
+    options: [],
+    nextOnClick: 'tianjieFnlEnd'
+  },
+  tianjieFnlKickOk: {
+    speaker: '旁 白',
+    onEnter: () => {
+      if (!storyFlags.tianjieFengnianlouDone) {
+        storyFlags.tianjieFengnianlouDone = true;
+        player.bondGuXianchan = (Number(player.bondGuXianchan) || 0) + 20;
+        storyFlags.airCujuSwitch = true;
+        updateCapitalNpcs();
+        saveGame();
+      }
+    },
+    text: () => `你的脸上毫无惧色，纵身而起，迎着那道下坠的人影就是一脚。
+“诶诶诶诶？！！！！”
+这一脚结结实实地落在对方身上，将其踹回窗台的方向。
+他一脸懵逼，还没反应过来发生了什么，紧接着就又被窗台处的倩丽身影一记侧踢，飞踹回了你的方向。
+你也丝毫没有客气的打算，抬腿就又是一脚。
+就这么和另一人玩起了空中蹴鞠。
+“呜啊？！噗——！”
+“靠！你们还有没有公德——噗哇！！！！”
+那小子也是耐揍得紧，被你们这般折磨，却还有力气开口谴责。
+一番折腾后，窗台上那人似乎是玩够了，轻哼一声，一记回旋踢将“蹴鞠”踢至旁处，而后回身走入房中。
+你也懒得去接，便任由“蹴鞠”扑腾一声落在地上。
+半晌过后，“蹴鞠”缓缓爬起，你仔细一瞧，竟是个丰神俊朗的少年。
+身形谈不上高大魁梧，却透露着几分精悍之气，似有千钧之力、偏又隐而不发。`,
+    options: [],
+    nextOnClick: 'tianjieFnlEnd'
+  },
+  tianjieFnlKickFail: {
+    speaker: '旁 白',
+    onEnter: () => {
+      if (!storyFlags.tianjieFengnianlouDone) {
+        storyFlags.tianjieFengnianlouDone = true;
+        updateCapitalNpcs();
+        saveGame();
+      }
+    },
+    text: () => `你的脸上毫无惧色，纵身而起，迎着那道下坠的人影就是一脚。
+“诶诶诶诶？！！！！”
+然而，你高估了自己的气力。
+这一脚结结实实地落在对方身上，但是却没能将其踹回，反倒是你们两人双双砸落到了地面上。
+不过也多亏了这一脚，至少你不用落得被人砸中而重伤倒地的下场了。
+“咳咳咳......”
+那人狼狈地从地上爬起，发觉自己压在你身上，赶忙跳至一旁，担心道。
+“你，你没事吧？！”
+你仔细一瞧，竟是个丰神俊朗的少年。
+身形谈不上高大魁梧，却透露着几分精悍之气，似有千钧之力、偏又隐而不发。`,
+    options: [],
+    nextOnClick: 'tianjieFnlEnd'
+  },
+  tianjieFnlDodgeOk: {
+    speaker: '旁 白',
+    onEnter: () => {
+      if (!storyFlags.tianjieFengnianlouDone) {
+        storyFlags.tianjieFengnianlouDone = true;
+        player.bondLongZhen = (Number(player.bondLongZhen) || 0) + 10;
+        updateCapitalNpcs();
+        saveGame();
+      }
+    },
+    text: () => `你轻轻一踏，巧妙地避开了坠落的人影，让他摔了个狗啃泥。
+“咳咳咳，你没事吧？”
+坠落之人缓缓从地上爬起。
+他那一袭白衣之上全是泥尘，样子狼狈不堪。
+可若仔细一瞧，亦能辨出狼狈之下所掩藏着的，是个丰神俊朗的少年。
+身形谈不上高大魁梧，却透露着几分精悍之气，似有千钧之力、偏又隐而不发。
+“身手不错嘛，真有你的。”
+他乐呵呵道。`,
+    options: [],
+    nextOnClick: 'tianjieFnlEnd'
+  },
+  tianjieFnlDodgeFail: {
+    speaker: '旁 白',
+    onEnter: () => {
+      if (!storyFlags.tianjieFengnianlouDone) {
+        storyFlags.tianjieFengnianlouDone = true;
+        updateCapitalNpcs();
+        saveGame();
+      }
+    },
+    text: () => `你想要避开，可惜轻功底子不佳，没能及时躲开。
+就在你以为这下完蛋了的时候，那人眼见自己就要砸到你身上，忽地深吸一口气，强行在半空中扭转身子，翻旋起来，以险之又险的距离与你擦身而过，摔倒在地上。
+“好险好险.....你没事吧？”
+坠落之人缓缓从地上爬起，心有余悸。
+他那一袭白衣之上全是泥尘，样子狼狈不堪。
+可若仔细一瞧，亦能辨出狼狈之下所掩藏着的，是个丰神俊朗的少年。
+身形谈不上高大魁梧，却透露着几分精悍之气，似有千钧之力、偏又隐而不发。`,
+    options: [],
+    nextOnClick: 'tianjieFnlEnd'
+  },
+  tianjieFnlEnd: {
+    speaker: '旁 白',
+    onEnter: () => {
+      if (!storyFlags.tianjieFengnianlouDone) {
+        storyFlags.tianjieFengnianlouDone = true;
+        updateCapitalNpcs();
+        saveGame();
+      }
+    },
+    text: () => `少年从容地拍了拍衣服上的尘土，随即转过身指着已经空无一人的窗台处破口大骂。
+“顾衔蝉，我XXX！”
+“........”
+没能等来任何回应，少年有些尴尬地停在路中央。
+眼见众人纷纷侧目，他咳嗽一声，向周围众人一拱手，接着便撒开腿、飞也似地跑走了。`,
+    options: []
+  },
+
+  /* ================= 京城住处 · 裴文秀（天街归来） ================= */
+  capitalPeiReturn: {
+    speaker: '裴 文 秀',
+    text: () => `“啊，兄长，您回来啦。”
+正在扫着院子落花的裴文秀瞧见你归来的身影，翩然一笑。
+“怎么样，玩得还开心吗？”
+“.......”
+你一时之间不知该如何作答，便摇了摇头。
+“哈哈~这样啊~”
+裴文秀的笑容似乎变得更灿烂了些，嫣然道。
+“兄长虽然嘴上不说，但眉宇之间还是隐隐流露出几分喜色呢。”
+“想来是遇到了些趣事吧。”`,
+    options: [
+      { label: '问起夏扑萤的事', next: 'capitalPeiReturnXia' }
+    ]
+  },
+  capitalPeiReturnXia: {
+    speaker: '裴 文 秀',
+    text: () => `“萤儿吗？”
+裴文秀的脸上露出狡黠的笑容。
+连昵称都用上了，也不知这俩人何时变得这般亲昵。
+“她可是在奋发图强，准备给兄长一份大大的惊喜呢。”
+“总之有我照看着，兄长您不用担心啦。”`,
+    options: [
+      { label: '问起“书”的事', next: 'capitalPeiReturnBook' }
+    ]
+  },
+  capitalPeiReturnBook: {
+    speaker: '裴 文 秀',
+    onEnter: () => {
+      if (!storyFlags.capitalPeiReturnDone) {
+        storyFlags.capitalPeiReturnDone = true;
+        updateCapitalNpcs();
+        saveGame();
+      }
+    },
+    text: () => `“唔嗯.....”
+她点着下巴，苦恼道。
+“不怎么顺利呢。”
+“我打听了好几日，却是不闻‘书’的下落。”
+“早知如此，儿时就不该背着爷爷，把‘书’卖掉换钱买糖吃了......”
+“........”
+似乎无意间听到了什么黑历史。
+裴文秀忽然反应过来，俏脸一红，连连摆手道。
+“没，没有的事！我，我是说，呃.......都怪爷爷背着我悄悄把‘书’卖掉换酒钱了！”
+“哼！没错！爷爷怎么这么坏！太坏了！大坏蛋！”
+她翘起鼻子，一边跺脚一边埋怨道。
+你不禁在心中对那名未曾谋面的“爷爷”心生几分怜悯。
+“兄长你不用操心啦，虽然进展不太顺利，但我也已经找到些线索了，再过些时日应当就有着落了！快，快，你刚回来，一定累慌了吧，快去歇息着，文秀待会便去给你烧水洗洗身子。”
+她连推带拉地将你带入屋内。`,
+    options: []
   }
 };
